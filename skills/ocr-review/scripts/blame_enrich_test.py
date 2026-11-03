@@ -16,7 +16,6 @@ import subprocess
 import sys
 import tempfile
 import unittest
-import urllib.error
 from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -30,27 +29,6 @@ PORCELAIN = (
     "author Bob\nauthor-mail <bob@x.com>\ncommitter-time 200\n\tline\n"
     "aaaaaaaa11111111aaaaaaaa11111111aaaaaaaa 5 5\n\tline\n"
 )
-
-
-class FakeResponse(io.BytesIO):
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc):
-        return False
-
-
-class CountingOpener:
-    def __init__(self, payload=None, error=None):
-        self.payload = payload
-        self.error = error
-        self.calls = 0
-
-    def __call__(self, req, timeout=None):
-        self.calls += 1
-        if self.error is not None:
-            raise self.error
-        return FakeResponse(json.dumps(self.payload).encode())
 
 
 class PorcelainTest(unittest.TestCase):
@@ -77,27 +55,14 @@ class UsernameTest(unittest.TestCase):
     def test_noreply_from_other_instance_is_ignored(self):
         self.assertIsNone(be.username_from_noreply("123-alice@users.noreply.gitlab.com", "gitlab.corp"))
 
-    def test_lookup_requires_unique_exact_match(self):
-        similar = [{"username": "bob", "public_email": "bob@x.com"},
-                   {"username": "bob2", "public_email": "bob@x.com.cn"}]
-        self.assertEqual(be.UserLookup("https://h", "t", opener=CountingOpener(similar)).username("Bob@X.com"), "bob")
+    def test_username_for_prefers_noreply(self):
+        self.assertEqual(be.username_for("123-jdoe@users.noreply.gitlab.com", "gitlab.com"), "jdoe")
 
-        dup = [{"username": "bob", "public_email": "bob@x.com"}, {"username": "bob2", "email": "bob@x.com"}]
-        self.assertIsNone(be.UserLookup("https://h", "t", opener=CountingOpener(dup)).username("bob@x.com"))
+    def test_username_for_falls_back_to_local_part(self):
+        self.assertEqual(be.username_for("xqding@corp.com", "gitlab.corp"), "xqding")
 
-        none = [{"username": "carol", "public_email": "carol@x.com"}]
-        self.assertIsNone(be.UserLookup("https://h", "t", opener=CountingOpener(none)).username("bob@x.com"))
-
-    def test_lookup_caches_per_email(self):
-        opener = CountingOpener([{"username": "bob", "public_email": "bob@x.com"}])
-        lookup = be.UserLookup("https://h", "t", opener=opener)
-        lookup.username("bob@x.com")
-        lookup.username("bob@x.com")
-        self.assertEqual(opener.calls, 1)
-
-    def test_lookup_http_error_returns_none(self):
-        err = urllib.error.HTTPError("https://h", 403, "forbidden", {}, io.BytesIO(b""))
-        self.assertIsNone(be.UserLookup("https://h", "t", opener=CountingOpener(error=err)).username("bob@x.com"))
+    def test_username_for_empty_email(self):
+        self.assertIsNone(be.username_for("", "gitlab.corp"))
 
 
 class EnrichTest(unittest.TestCase):
@@ -174,12 +139,11 @@ class MainTest(unittest.TestCase):
             with open(path, "w") as f:
                 json.dump({"comments": [{"path": "a.go", "start_line": 3, "end_line": 3, "content": "c"}]}, f)
             with mock.patch.object(be, "git_blame", return_value=PORCELAIN), \
-                    mock.patch.object(be, "resolve_token", return_value=""), \
                     mock.patch("sys.stderr", io.StringIO()) as err:
                 code = be.main([path, "--head", "H", "--server-url", "https://h.com"])
             self.assertEqual(code, 0)
             with open(path) as f:
-                self.assertTrue(json.load(f)["comments"][0]["content"].endswith("Introduced by: Bob (bbbbbbbb)"))
+                self.assertTrue(json.load(f)["comments"][0]["content"].endswith("Introduced by: @bob (bbbbbbbb)"))
             self.assertIn("Introducer added to 1/1 comment(s)", err.getvalue())
 
 

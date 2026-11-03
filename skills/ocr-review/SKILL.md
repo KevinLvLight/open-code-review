@@ -144,7 +144,7 @@ Continue to Steps 4 and 5 even if `ocr review` exits non-zero: `post_review.py` 
 python3 <skill-dir>/scripts/blame_enrich.py "<work>/ocr-result.json" --head <head_sha> --server-url <server_url>
 ```
 
-For each located comment this blames the flagged lines at `<head_sha>`, takes the most recent commit, and appends `Introduced by: @<username> (<sha>)`. When no GitLab user matches the author's email exactly, it appends the plain author name instead, so nobody is mentioned by mistake. It always exits 0.
+For each located comment this blames the flagged lines at `<head_sha>`, takes the most recent commit, and appends `Introduced by: @<username> (<sha>)`. The username is the local part of the author email (or the username in a GitLab noreply address), since non-admin tokens cannot look up private emails; if that is not a GitLab user, the mention renders as plain text and notifies nobody. It always exits 0.
 
 ### Step 5: Post to the Merge Request
 

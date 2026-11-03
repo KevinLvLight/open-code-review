@@ -134,10 +134,10 @@ skills/ocr-review/
 - **对每条评论**：
   1. 如果 `start_line == end_line == 0`，或文件在 `head` 中不存在，就跳过，不写引入者。
   2. 运行 `git blame --porcelain -L <start>,<end> <head> -- <path>` 并解析。如果这几行来自多个提交，取 `committer-time` **最新**的那个提交。
-  3. 用作者邮箱查询用户名：调用 `GET /api/v4/users?search=<email>`，只接受 `public_email` 或 `email` 与邮箱精确匹配（忽略大小写）的唯一结果。邮箱是 GitLab noreply 地址（`<id>-<username>@users.noreply.<host>`）时，直接从地址中解析出 username。同一个邮箱在单次运行中只查询一次。
+  3. 由作者邮箱得到用户名，不调用 API：邮箱是 GitLab noreply 地址（`<id>-<username>@users.noreply.<host>`）时，从地址中解析出 username；否则直接取邮箱 `@` 前的部分。非管理员 token 查不到别人的私有邮箱，而公司邮箱前缀通常就是用户名。前缀不是 GitLab 用户时，@ 只渲染为普通文本，不通知任何人；前缀恰好是另一个人的用户名时会误通知，这一点已接受。
   4. 在 `content` 末尾追加一行（文案为英文，原因见“合规事项”）：
-     - 能查到用户名：`\n\nIntroduced by: @<username> (<short_sha>)`
-     - 查不到用户名：`\n\nIntroduced by: <author_name> (<short_sha>)`，不 @ 任何人
+     - 有用户名：`\n\nIntroduced by: @<username> (<short_sha>)`
+     - 邮箱为空：`\n\nIntroduced by: <author_name> (<short_sha>)`，不 @ 任何人
 - 不区分引入提交是否在本 MR 范围内，一律标注 blame 作者。用户已确认这一点，接受因此 @ 到历史代码作者。
 - 任何一条评论处理失败（blame 出错、API 出错），都只跳过这一条，在 stderr 记录警告，退出码仍为 0。
 - 输入 JSON 解析失败时，保持文件不变并以 0 退出，交给 `post_review.py` 的错误路径处理：它会把 stderr 发到 MR 总结里。

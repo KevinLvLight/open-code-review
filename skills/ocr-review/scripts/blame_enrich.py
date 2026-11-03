@@ -9,8 +9,9 @@
 For every located comment, blames its line range at the reviewed head, takes
 the most recent commit touching those lines, and appends
 "Introduced by: @<username> (<sha>)". The username comes from a GitLab noreply
-address or an exact, unique email match on the users API; otherwise the plain
-author name is used so nobody is mentioned by mistake.
+address, otherwise from the local part of the author email: non-admin tokens
+cannot look up private emails, and corporate addresses usually share their
+local part with the username. A name that is no GitLab user renders as plain text.
 
 Never fails the pipeline: a comment that cannot be blamed is left as is, and
 an unreadable result file is left untouched for post_review.py to report.
@@ -18,14 +19,11 @@ an unreadable result file is left untouched for post_review.py to report.
 
 import argparse
 import json
-import os
 import re
 import subprocess
 import sys
 import urllib.parse
 from typing import Callable, Dict, List, Optional
-
-from mr_context import GitLabError, api_get, resolve_token
 
 NOREPLY_RE = re.compile(r"^\d+-([^@]+)@users\.noreply\.(.+)$", re.IGNORECASE)
 HEADER_RE = re.compile(r"^([0-9a-f]{40}) \d+ \d+(?: \d+)?$")
@@ -61,28 +59,8 @@ def username_from_noreply(email: str, host: str) -> Optional[str]:
     return m.group(1) if m and m.group(2).lower() == host.lower() else None
 
 
-class UserLookup:
-    def __init__(self, server_url: str, token: str, opener=None):
-        self.server_url = server_url
-        self.token = token
-        self.opener = opener
-        self.cache: Dict[str, Optional[str]] = {}
-
-    def username(self, email: str) -> Optional[str]:
-        key = email.lower()
-        if key not in self.cache:
-            self.cache[key] = self._search(key)
-        return self.cache[key]
-
-    def _search(self, email: str) -> Optional[str]:
-        try:
-            users = api_get(self.server_url, "/users?search=" + urllib.parse.quote(email), self.token,
-                            opener=self.opener)
-        except GitLabError:
-            return None
-        matches = [u.get("username") for u in users or []
-                   if email in ((u.get("public_email") or "").lower(), (u.get("email") or "").lower())]
-        return matches[0] if len(matches) == 1 else None
+def username_for(email: str, host: str) -> Optional[str]:
+    return username_from_noreply(email, host) or email.partition("@")[0] or None
 
 
 def introducer_line(commit: dict, username: Optional[str]) -> str:
@@ -120,7 +98,7 @@ def parse_args(argv):
     p = argparse.ArgumentParser(description="Add the introducing author to ocr review comments.")
     p.add_argument("input", help="ocr review --format json result, rewritten in place")
     p.add_argument("--head", required=True, help="reviewed head commit (diff_refs.head_sha)")
-    p.add_argument("--server-url", required=True, help="GitLab base URL used to resolve usernames")
+    p.add_argument("--server-url", required=True, help="GitLab base URL, used to recognise its noreply addresses")
     return p.parse_args(argv)
 
 
@@ -137,13 +115,7 @@ def main(argv=None) -> int:
         return 0
 
     host = urllib.parse.urlsplit(args.server_url).hostname or ""
-    token = resolve_token(host, os.environ)
-    users = UserLookup(args.server_url, token) if token else None
-
-    def lookup(email: str) -> Optional[str]:
-        return username_from_noreply(email, host) or (users.username(email) if users and email else None)
-
-    n = enrich(result, args.head, blame=git_blame, lookup=lookup)
+    n = enrich(result, args.head, blame=git_blame, lookup=lambda email: username_for(email, host))
     with open(args.input, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
     print("Introducer added to %d/%d comment(s)" % (n, len(result["comments"])), file=sys.stderr)
