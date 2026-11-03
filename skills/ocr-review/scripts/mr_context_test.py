@@ -135,6 +135,13 @@ class FetchMRTest(unittest.TestCase):
         out = mc.fetch_mr(MRRef("https://gitlab.com", "grp/proj", 12), "tok", opener=RecordingOpener(payload))
         self.assertEqual(out["description"], "")
 
+    def test_fetch_mr_partial_payload_raises_gitlab_error(self):
+        payload = {k: v for k, v in MR_JSON.items() if k != "target_branch"}
+        with self.assertRaises(mc.GitLabError):
+            mc.fetch_mr(MRRef("https://gitlab.com", "grp/proj", 12), "tok", opener=RecordingOpener(payload))
+        with self.assertRaises(mc.GitLabError):
+            mc.fetch_mr(MRRef("https://gitlab.com", "grp/proj", 12), "tok", opener=RecordingOpener(["not", "a", "dict"]))
+
     def test_api_get_404_raises(self):
         with self.assertRaises(mc.GitLabError) as cm:
             mc.api_get("https://h.com", "/projects/1", "tok", opener=RecordingOpener(error=http_error(404)))

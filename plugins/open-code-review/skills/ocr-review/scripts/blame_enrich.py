@@ -102,6 +102,7 @@ def enrich(result: dict, head: str, blame: Callable[[str, str, int, int], Option
     for c in result.get("comments") or []:
         start = int(c.get("start_line") or 0)
         end = int(c.get("end_line") or 0) or start
+        start, end = min(start, end), max(start, end)
         path = c.get("path") or ""
         if start <= 0 or not path:
             continue

@@ -122,6 +122,13 @@ class EnrichTest(unittest.TestCase):
         be.enrich(result, "H", blame=lambda *a: calls.append(a) or PORCELAIN, lookup=lambda e: None)
         self.assertEqual(calls, [("H", "a.go", 4, 4)])
 
+    def test_enrich_normalizes_inverted_range(self):
+        result = {"comments": [{"path": "a.go", "start_line": 5, "end_line": 3, "content": "x"}]}
+        calls = []
+        n = be.enrich(result, "H", blame=lambda *a: calls.append(a) or PORCELAIN, lookup=lambda e: None)
+        self.assertEqual(calls, [("H", "a.go", 3, 5)])
+        self.assertEqual(n, 1)
+
     def test_enrich_skips_zero_lines(self):
         result = {"comments": [{"path": "a.go", "start_line": 0, "end_line": 0, "content": "x"}]}
         blame = mock.Mock()

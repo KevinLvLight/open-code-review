@@ -92,6 +92,8 @@ def api_get(server_url: str, path: str, token: str, opener=None) -> Any:
 def fetch_mr(ref: MRRef, token: str, opener=None) -> dict:
     path = "/projects/%s/merge_requests/%d" % (urllib.parse.quote(ref.project_path, safe=""), ref.iid)
     mr = api_get(ref.server_url, path, token, opener=opener)
+    if not isinstance(mr, dict) or not all(mr.get(k) for k in ("project_id", "iid", "target_branch")):
+        raise GitLabError(0, "unexpected merge request payload from GitLab")
     return {
         "server_url": ref.server_url,
         "project_path": ref.project_path,
