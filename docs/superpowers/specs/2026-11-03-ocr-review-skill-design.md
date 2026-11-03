@@ -76,7 +76,7 @@ skills/ocr-review/
    token 不写入输出。后续步骤需要 token 时，各脚本按同一顺序自行获取，见“token 获取”。
 2. **拉取提交**：
    ```bash
-   git fetch origin "refs/merge-requests/<iid>/head" "<target_branch>"
+   git fetch origin "refs/merge-requests/<iid>/head"
    ```
    使用 `refs/merge-requests/<iid>/head` 是为了让 fork MR 也能拉到。该命令不切换当前分支，也不改动工作区。
    因为范围模式下 `file_read`、`file_find`、`code_search` 都按 `--to` 那个提交读取内容，本地处在任何分支、工作区有未提交改动，都不影响审查结果。
@@ -116,9 +116,11 @@ skills/ocr-review/
   - `server_url` 取 scheme 加 host。如果自建实例部署在子路径下（如 `https://h/gitlab/...`），无法从链接区分子路径和组路径，因此支持用 `--server-url` 显式覆盖。
   - 解析失败时退出码为 2，并给出示例链接。
 - **token 获取**：只要拿到非空值就停止。
-  1. 环境变量 `GITLAB_TOKEN`
-  2. 环境变量 `GITLAB_API_TOKEN`，与 CI 示例保持一致
-  3. 安装了 `glab` 时，执行 `glab config get token --host <host>`
+  1. 安装了 `glab` 时，执行 `glab config get token --host <host>`。glab 按 host 分别保存 token，所以放在第一位，避免把发给别的实例的 token 送出去
+  2. 环境变量 `GITLAB_TOKEN`
+  3. 环境变量 `GITLAB_API_TOKEN`，与 CI 示例保持一致
+
+  如果设置了 `GITLAB_HOST` 且它与目标 host 不同，就不使用第 2、3 项的环境变量 token。
 
   三者都拿不到时退出码为 3，提示运行 `glab auth login --hostname <host>` 或设置 `GITLAB_TOKEN`。
 - **API 调用**：`GET <server_url>/api/v4/projects/<urlencoded path>/merge_requests/<iid>`，请求头为 `PRIVATE-TOKEN`。

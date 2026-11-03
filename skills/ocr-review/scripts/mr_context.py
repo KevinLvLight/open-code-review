@@ -65,14 +65,19 @@ def parse_mr_url(url: str, server_url: Optional[str] = None) -> MRRef:
 
 
 def resolve_token(host: str, env: Mapping[str, str], which=shutil.which, run=subprocess.run) -> str:
+    # glab stores one token per host, so it goes first: a GITLAB_TOKEN meant for
+    # another instance must not be sent to whatever host the MR link points at.
+    if which("glab"):
+        proc = run(["glab", "config", "get", "token", "--host", host],
+                   capture_output=True, text=True, check=False)
+        if proc.returncode == 0 and proc.stdout.strip():
+            return proc.stdout.strip()
+    pinned = env.get("GITLAB_HOST", "")
+    if pinned and (urllib.parse.urlsplit(pinned).hostname or pinned) != host:
+        return ""
     for name in ("GITLAB_TOKEN", "GITLAB_API_TOKEN"):
         if env.get(name):
             return env[name]
-    if which("glab"):
-        proc = run(["glab", "config", "get", "token", "--host", host],
-                    capture_output=True, text=True, check=False)
-        if proc.returncode == 0:
-            return proc.stdout.strip()
     return ""
 
 
@@ -94,6 +99,9 @@ def fetch_mr(ref: MRRef, token: str, opener=None) -> dict:
     mr = api_get(ref.server_url, path, token, opener=opener)
     if not isinstance(mr, dict) or not all(mr.get(k) for k in ("project_id", "iid", "target_branch")):
         raise GitLabError(0, "unexpected merge request payload from GitLab")
+    refs = mr.get("diff_refs") or {}
+    if not (refs.get("base_sha") and refs.get("head_sha")):
+        raise GitLabError(0, "merge request has no diff_refs yet; retry once GitLab has computed its diff")
     return {
         "server_url": ref.server_url,
         "project_path": ref.project_path,
@@ -103,7 +111,7 @@ def fetch_mr(ref: MRRef, token: str, opener=None) -> dict:
         "description": mr.get("description") or "",
         "target_branch": mr["target_branch"],
         "web_url": mr.get("web_url") or "",
-        "diff_refs": mr.get("diff_refs") or {},
+        "diff_refs": refs,
     }
 
 
@@ -159,7 +167,10 @@ def main(argv=None) -> int:
         with open(args.background_out, "w", encoding="utf-8") as f:
             f.write(background_text(mr["title"], mr["description"]))
 
-    print(json.dumps(mr, ensure_ascii=False, indent=2))
+    # Title and description are author-controlled text; they reach the review
+    # only through the background file, never the agent's own context.
+    public = {k: v for k, v in mr.items() if k not in ("title", "description")}
+    print(json.dumps(public, ensure_ascii=False, indent=2))
     return 0
 
 

@@ -27,7 +27,7 @@ from typing import Callable, Dict, List, Optional
 
 from mr_context import GitLabError, api_get, resolve_token
 
-NOREPLY_RE = re.compile(r"^\d+-([^@]+)@users\.noreply\.", re.IGNORECASE)
+NOREPLY_RE = re.compile(r"^\d+-([^@]+)@users\.noreply\.(.+)$", re.IGNORECASE)
 HEADER_RE = re.compile(r"^([0-9a-f]{40}) \d+ \d+(?: \d+)?$")
 
 
@@ -56,9 +56,9 @@ def newest(commits: List[dict]) -> Optional[dict]:
     return max(commits, key=lambda c: c["committer_time"], default=None)
 
 
-def username_from_noreply(email: str) -> Optional[str]:
+def username_from_noreply(email: str, host: str) -> Optional[str]:
     m = NOREPLY_RE.match(email)
-    return m.group(1) if m else None
+    return m.group(1) if m and m.group(2).lower() == host.lower() else None
 
 
 class UserLookup:
@@ -141,7 +141,7 @@ def main(argv=None) -> int:
     users = UserLookup(args.server_url, token) if token else None
 
     def lookup(email: str) -> Optional[str]:
-        return username_from_noreply(email) or (users.username(email) if users and email else None)
+        return username_from_noreply(email, host) or (users.username(email) if users and email else None)
 
     n = enrich(result, args.head, blame=git_blame, lookup=lookup)
     with open(args.input, "w", encoding="utf-8") as f:

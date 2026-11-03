@@ -99,10 +99,19 @@ class ResolveTokenTest(unittest.TestCase):
         self.assertEqual(mc.resolve_token("h.com", {"GITLAB_TOKEN": "a", "GITLAB_API_TOKEN": "b"}, which=no_glab), "a")
         self.assertEqual(mc.resolve_token("h.com", {"GITLAB_API_TOKEN": "b"}, which=no_glab), "b")
 
-    def test_env_wins_over_glab(self):
-        run = mock.Mock()
+    def test_glab_host_token_wins_over_env(self):
+        run = mock.Mock(return_value=subprocess.CompletedProcess([], 0, stdout="corp-tok\n", stderr=""))
+        tok = mc.resolve_token("gitlab.corp", {"GITLAB_TOKEN": "com-tok"}, which=lambda _: "/bin/glab", run=run)
+        self.assertEqual(tok, "corp-tok")
+
+    def test_env_token_falls_back_when_glab_has_none(self):
+        run = mock.Mock(return_value=subprocess.CompletedProcess([], 0, stdout="\n", stderr=""))
         self.assertEqual(mc.resolve_token("h.com", {"GITLAB_TOKEN": "a"}, which=lambda _: "/bin/glab", run=run), "a")
-        run.assert_not_called()
+
+    def test_env_token_not_sent_to_other_gitlab_host(self):
+        env = {"GITLAB_TOKEN": "a", "GITLAB_HOST": "https://gitlab.com"}
+        self.assertEqual(mc.resolve_token("gitlab.corp", env, which=lambda _: None), "")
+        self.assertEqual(mc.resolve_token("gitlab.com", env, which=lambda _: None), "a")
 
     def test_token_from_glab(self):
         run = mock.Mock(return_value=subprocess.CompletedProcess([], 0, stdout="glab-tok\n", stderr=""))
@@ -129,6 +138,12 @@ class FetchMRTest(unittest.TestCase):
                                     "description", "target_branch", "web_url", "diff_refs"})
         self.assertEqual(out["project_id"], 42)
         self.assertEqual(out["diff_refs"]["head_sha"], "h" * 40)
+
+    def test_missing_diff_refs_raises_gitlab_error(self):
+        for refs in (None, {"base_sha": None, "start_sha": None, "head_sha": None}):
+            payload = dict(MR_JSON, diff_refs=refs)
+            with self.assertRaises(mc.GitLabError):
+                mc.fetch_mr(MRRef("https://gitlab.com", "grp/proj", 12), "tok", opener=RecordingOpener(payload))
 
     def test_null_description_becomes_empty(self):
         payload = dict(MR_JSON, description=None)
@@ -194,8 +209,12 @@ class MainTest(unittest.TestCase):
     def test_success_prints_json_without_token(self):
         code, out, _ = self.run_main(["https://gitlab.com/grp/proj/-/merge_requests/12"], {"GITLAB_TOKEN": "sekret"})
         self.assertEqual(code, 0)
-        self.assertEqual(json.loads(out)["iid"], 12)
+        printed = json.loads(out)
+        self.assertEqual(printed["iid"], 12)
         self.assertNotIn("sekret", out)
+        self.assertNotIn("description", printed)
+        self.assertNotIn("title", printed)
+        self.assertNotIn("Speeds up lookups", out)
 
     def test_print_token(self):
         code, out, _ = self.run_main(["https://h.com/g/p/-/merge_requests/1", "--print-token"], {"GITLAB_TOKEN": "t"})

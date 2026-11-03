@@ -70,9 +70,12 @@ class PorcelainTest(unittest.TestCase):
 
 class UsernameTest(unittest.TestCase):
     def test_noreply(self):
-        self.assertEqual(be.username_from_noreply("123-jdoe@users.noreply.gitlab.com"), "jdoe")
-        self.assertEqual(be.username_from_noreply("9-j.doe@USERS.NOREPLY.git.corp.com"), "j.doe")
-        self.assertIsNone(be.username_from_noreply("jdoe@corp.com"))
+        self.assertEqual(be.username_from_noreply("123-jdoe@users.noreply.gitlab.com", "gitlab.com"), "jdoe")
+        self.assertEqual(be.username_from_noreply("9-j.doe@USERS.NOREPLY.git.corp.com", "git.corp.com"), "j.doe")
+        self.assertIsNone(be.username_from_noreply("jdoe@corp.com", "gitlab.com"))
+
+    def test_noreply_from_other_instance_is_ignored(self):
+        self.assertIsNone(be.username_from_noreply("123-alice@users.noreply.gitlab.com", "gitlab.corp"))
 
     def test_lookup_requires_unique_exact_match(self):
         similar = [{"username": "bob", "public_email": "bob@x.com"},
