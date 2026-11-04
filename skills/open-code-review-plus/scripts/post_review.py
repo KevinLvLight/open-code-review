@@ -2,8 +2,9 @@
 
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 alibaba/open-code-review Contributors
-# Derived from examples/gitlab_ci/post_review.py; differs only in posting the summary note
-# when a finding could not go inline (see post_review_test.py). Port fixes from the original.
+# Derived from examples/gitlab_ci/post_review.py; differs in posting the summary note only
+# when a finding could not go inline, and in anchoring on unchanged lines with old_line
+# (see post_review_test.py). Port fixes from the original.
 
 """Post an OpenCodeReview result onto a GitLab merge request.
 
@@ -1367,6 +1368,11 @@ def publish(result, diff_refs, poster, config, sleep=_sleep):
                 "head_sha": diff_refs["head_sha"],
             },
         }
+        # GitLab cannot place an anchor on an unchanged line from new_line
+        # alone; the LLM often ends a range on the context line after a hunk.
+        anchor = ((get_diff_inventory(poster, diff_cache) or {}).get("positions") or {}).get(path, {}).get(end_line)
+        if anchor and anchor["type"] == "context":
+            discussion["position"]["old_line"] = anchor["old_line"]
         if span is not None and span["multiline"]:
             # Resolve the range from the real MR diff: a boundary's line_code
             # needs the true old-file line unless the line is a pure addition.

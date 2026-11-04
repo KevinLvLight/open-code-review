@@ -56,7 +56,7 @@ skills/open-code-review-plus/
 
 - 在 `plugins/open-code-review/skills/open-code-review-plus/` 放一份镜像，规则与现有 Skill 的镜像相同。
 - 所有脚本只用 Python 3 标准库，并带 SPDX 头。新增的 `.py` 文件用 `make license-add` 添加头部。
-- `post_review.py` 基于 `examples/gitlab_ci/post_review.py`，唯一差异：所有意见都成功发成行级评论、且没有警告时，不发汇总评论；有意见无法行级发布（无行号、被 GitLab 拒绝）或有警告时，才发汇总兜底。没有任何意见时仍发一条 LGTM 汇总。文件头注释说明了这一差异，原件的修复需要手动移植。SKILL.md 中写明它的本地审查章节需要和 `skills/open-code-review/SKILL.md` 同步。
+- `post_review.py` 基于 `examples/gitlab_ci/post_review.py`，唯一差异：所有意见都成功发成行级评论、且没有警告时，不发汇总评论；有意见无法行级发布（无行号、被 GitLab 拒绝）或有警告时，才发汇总兜底。没有任何意见时仍发一条 LGTM 汇总。另一处差异：意见范围的终点落在未变的上下文行时，锚点同时带上 `old_line`，否则 GitLab 会以 400 拒绝该行级评论。文件头注释说明了这一差异，原件的修复需要手动移植。SKILL.md 中写明它的本地审查章节需要和 `skills/open-code-review/SKILL.md` 同步。
 
 ## SKILL.md 流程
 
