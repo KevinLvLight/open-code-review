@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 alibaba/open-code-review Contributors
 
-"""Tests for the ocr-review changes to post_review.py: the summary note is
+"""Tests for the open-code-review-plus changes to post_review.py: the summary note is
 posted only when something could not go inline. The rest of the script is
 covered by examples/gitlab_ci/post_review_test.py."""
 

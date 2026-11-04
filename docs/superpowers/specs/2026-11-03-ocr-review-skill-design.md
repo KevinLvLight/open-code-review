@@ -1,4 +1,4 @@
-# ocr-review Skill 设计
+# open-code-review-plus Skill 设计
 
 日期：2026-11-03
 状态：待审阅
@@ -7,7 +7,7 @@
 
 现有的 `skills/open-code-review` Skill 只审查本地 git 变更，不读取 MR 信息，也不回写评论。`ocr` CLI 本身同样没有 MR 能力，MR 联动只存在于 CI 示例中（`examples/gitlab_ci/`）。
 
-本设计新增一个 Skill：`ocr-review`。名称刻意不带 GitLab 或 MR，以免让人误以为它只能扫描 MR；SKILL.md 的 description 中同时写明“审查本地变更”和“审查 GitLab MR 并回写评论”两种触发场景。
+本设计新增一个 Skill：`open-code-review-plus`。名称刻意不带 GitLab 或 MR，以免让人误以为它只能扫描 MR；SKILL.md 的 description 中同时写明“审查本地变更”和“审查 GitLab MR 并回写评论”两种触发场景。
 
 - **使用场景：** 开发者在本地 Agent（如 Claude Code）中给出 GitLab MR 链接（gitlab.com 或自建实例）。Skill 拉取 MR 的提交并运行审查，然后**自动**把结果回写到 MR。
 - **回写形式：**
@@ -44,7 +44,7 @@
 ## 目录结构
 
 ```
-skills/ocr-review/
+skills/open-code-review-plus/
 ├── SKILL.md
 └── scripts/
     ├── mr_context.py        # 解析 MR 链接，获取 token，读取 MR 元数据
@@ -54,7 +54,7 @@ skills/ocr-review/
     └── post_review.py       # 基于 examples/gitlab_ci/post_review.py，只改了汇总评论的发帖条件
 ```
 
-- 在 `plugins/open-code-review/skills/ocr-review/` 放一份镜像，规则与现有 Skill 的镜像相同。
+- 在 `plugins/open-code-review/skills/open-code-review-plus/` 放一份镜像，规则与现有 Skill 的镜像相同。
 - 所有脚本只用 Python 3 标准库，并带 SPDX 头。新增的 `.py` 文件用 `make license-add` 添加头部。
 - `post_review.py` 基于 `examples/gitlab_ci/post_review.py`，唯一差异：所有意见都成功发成行级评论、且没有警告时，不发汇总评论；有意见无法行级发布（无行号、被 GitLab 拒绝）或有警告时，才发汇总兜底。没有任何意见时仍发一条 LGTM 汇总。文件头注释说明了这一差异，原件的修复需要手动移植。SKILL.md 中写明它的本地审查章节需要和 `skills/open-code-review/SKILL.md` 同步。
 
@@ -166,7 +166,7 @@ skills/ocr-review/
   - 跳过行号为 0 的评论
   - 单条失败不影响其余评论
   - 输入 JSON 损坏时文件保持不变
-- 运行方式：`python3 -m unittest discover -s skills/ocr-review/scripts -p '*_test.py'`
+- 运行方式：`python3 -m unittest discover -s skills/open-code-review-plus/scripts -p '*_test.py'`
 - 端到端验证：
   1. 对测试 MR 运行完整流程，`post_review.py` 加 `--dry-run`，检查行内评论、suggestion 和引入者。
   2. 去掉 `--dry-run` 真实回写一次；再运行一次，确认总结被就地更新、没有重复的 Discussion。

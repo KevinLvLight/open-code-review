@@ -4,7 +4,7 @@
 # Copyright 2026 alibaba/open-code-review Contributors
 
 
-"""Resolve a GitLab merge request URL into the metadata ocr-review needs.
+"""Resolve a GitLab merge request URL into the metadata open-code-review-plus needs.
 
 Prints the MR as JSON (never the token), optionally writes the review
 background file, or with --print-token prints only the resolved token so the
@@ -121,7 +121,7 @@ def background_text(title: str, description: str, limit: int = BACKGROUND_LIMIT)
 
 
 def parse_args(argv):
-    p = argparse.ArgumentParser(description="Resolve a GitLab merge request for ocr-review.")
+    p = argparse.ArgumentParser(description="Resolve a GitLab merge request for open-code-review-plus.")
     p.add_argument("url", help="merge request URL, e.g. https://gitlab.com/group/project/-/merge_requests/1")
     p.add_argument("--server-url", help="GitLab base URL when the instance is served under a sub-path")
     p.add_argument("--print-token", action="store_true", help="print only the resolved token")

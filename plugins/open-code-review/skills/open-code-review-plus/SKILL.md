@@ -1,5 +1,5 @@
 ---
-name: ocr-review
+name: open-code-review-plus
 description: >
   使用 alibaba/open-code-review 的 `ocr` CLI 做 AI 代码审查（code review），
   可审查本地 Git 改动，也可审查 GitLab 合并请求（merge request / MR）。
@@ -20,9 +20,9 @@ metadata:
   version: "1.0.0"
 ---
 
-# OCR Review
+# Open Code Review Plus
 
-本 Codex 插件 Skill 刻意镜像规范版本 `skills/ocr-review/SKILL.md`。更新 OCR Agent 说明时，请保持两份文件同步；不使用符号链接，是因为插件安装时可能只会落地插件子目录。
+本 Codex 插件 Skill 刻意镜像规范版本 `skills/open-code-review-plus/SKILL.md`。更新 OCR Agent 说明时，请保持两份文件同步；不使用符号链接，是因为插件安装时可能只会落地插件子目录。
 
 本 Skill 调用 [open-code-review](https://github.com/alibaba/open-code-review)（`ocr`）对本地改动或 GitLab 合并请求做代码审查。`ocr` 是一个开源的 AI 代码审查 CLI，读取 Git diff，生成结构化的逐行审查意见。
 
@@ -104,7 +104,7 @@ OCR 的每条意见都带有结构化的 `severity`（critical / high / medium /
 - `PATH` 中有 `python3`。
 - 一个对该 GitLab 实例具有 `api` 权限的 token：优先使用 `glab auth login --hostname <host>` 的登录会话（glab 按实例分别保存 token），否则使用 `GITLAB_TOKEN` / `GITLAB_API_TOKEN`。如果 `GITLAB_HOST` 指向另一个实例，则不使用环境变量里的 token，避免把一个实例的 token 发给另一个实例。
 
-以下命令中，`<skill-dir>` 是本 SKILL.md 所在目录。中间文件放在 `<work>`，即 `echo "$(git rev-parse --absolute-git-dir)/ocr-review"` 打印出的绝对路径。它位于 `.git` 内部，之后做工作区审查时不会被当成未跟踪文件。第 1 步之前先用 `mkdir -p "<work>"` 创建它。
+以下命令中，`<skill-dir>` 是本 SKILL.md 所在目录。中间文件放在 `<work>`，即 `echo "$(git rev-parse --absolute-git-dir)/open-code-review-plus"` 打印出的绝对路径。它位于 `.git` 内部，之后做工作区审查时不会被当成未跟踪文件。第 1 步之前先用 `mkdir -p "<work>"` 创建它。
 
 ### 第 1 步：解析合并请求
 

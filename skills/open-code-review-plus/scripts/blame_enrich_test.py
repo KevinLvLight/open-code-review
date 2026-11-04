@@ -6,7 +6,7 @@
 
 """Tests for blame_enrich.py. Standard-library unittest only, no network:
 
-    python3 -m unittest discover -s skills/ocr-review/scripts -p '*_test.py'
+    python3 -m unittest discover -s skills/open-code-review-plus/scripts -p '*_test.py'
 """
 
 import io
