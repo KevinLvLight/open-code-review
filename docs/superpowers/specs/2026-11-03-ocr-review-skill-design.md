@@ -51,12 +51,12 @@ skills/ocr-review/
     ├── mr_context_test.py
     ├── blame_enrich.py      # git blame 加用户名查询，把引入者写入评论
     ├── blame_enrich_test.py
-    └── post_review.py       # 从 examples/gitlab_ci/post_review.py 原样拷贝，不做修改
+    └── post_review.py       # 基于 examples/gitlab_ci/post_review.py，只改了汇总评论的发帖条件
 ```
 
 - 在 `plugins/open-code-review/skills/ocr-review/` 放一份镜像，规则与现有 Skill 的镜像相同。
 - 所有脚本只用 Python 3 标准库，并带 SPDX 头。新增的 `.py` 文件用 `make license-add` 添加头部。
-- `post_review.py` 文件头加一行注释，说明它拷贝自 `examples/gitlab_ci/post_review.py`，修改应先改原件再同步。SKILL.md 中写明它的本地审查章节需要和 `skills/open-code-review/SKILL.md` 同步。
+- `post_review.py` 基于 `examples/gitlab_ci/post_review.py`，唯一差异：所有意见都成功发成行级评论、且没有警告时，不发汇总评论；有意见无法行级发布（无行号、被 GitLab 拒绝）或有警告时，才发汇总兜底。没有任何意见时仍发一条 LGTM 汇总。文件头注释说明了这一差异，原件的修复需要手动移植。SKILL.md 中写明它的本地审查章节需要和 `skills/open-code-review/SKILL.md` 同步。
 
 ## SKILL.md 流程
 

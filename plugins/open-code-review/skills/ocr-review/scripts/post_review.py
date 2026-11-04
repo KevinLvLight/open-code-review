@@ -2,7 +2,8 @@
 
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 alibaba/open-code-review Contributors
-# Copied verbatim from examples/gitlab_ci/post_review.py; edit the original and re-copy.
+# Derived from examples/gitlab_ci/post_review.py; differs only in posting the summary note
+# when a finding could not go inline (see post_review_test.py). Port fixes from the original.
 
 """Post an OpenCodeReview result onto a GitLab merge request.
 
@@ -1330,12 +1331,15 @@ def publish(result, diff_refs, poster, config, sleep=_sleep):
     # same note at finalize instead of creating a duplicate.
     run_tag = config.get("run_tag", "0-0")
     anchor_id = None
-    anchor_body = wrap_summary_body(
-        build_pre_review_summary_body(stats["total"], no_line, routed, warnings),
-        run_tag,
-    )
-    anchor_id = ensure_summary_anchor(poster, anchor_body, sticky,
-                                      tag=summary_tag_for(run_tag))
+    # A summary that would only repeat "all posted inline" is noise, so it
+    # appears only once something has to fall back to it.
+    if no_line or routed or warnings:
+        anchor_body = wrap_summary_body(
+            build_pre_review_summary_body(stats["total"], no_line, routed, warnings),
+            run_tag,
+        )
+        anchor_id = ensure_summary_anchor(poster, anchor_body, sticky,
+                                          tag=summary_tag_for(run_tag))
 
     # Post inline discussions.
     diff_cache = {"diff": None, "fetched": False}
@@ -1399,6 +1403,9 @@ def publish(result, diff_refs, poster, config, sleep=_sleep):
 
     log("Successfully posted %d/%d inline comments." % (stats["inline"], len(comments)))
     stats["failed"] = len(failed_comments)
+    if not (no_line or routed or failed_comments or warnings):
+        stats["summary_url"] = poster.mr_url()
+        return stats
 
     # Finalize the summary with the complete body.
     summary_body = build_summary_body(
