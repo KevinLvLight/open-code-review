@@ -8,11 +8,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/alibaba/open-code-review/internal/agent"
 	"github.com/alibaba/open-code-review/internal/config/rules"
 	"github.com/alibaba/open-code-review/internal/delegate"
 	"github.com/alibaba/open-code-review/internal/diff"
+	"github.com/alibaba/open-code-review/internal/session"
 	"github.com/alibaba/open-code-review/internal/tool"
 	"github.com/spf13/cobra"
 )
@@ -32,6 +34,9 @@ type delegateOptions struct {
 
 var delegatePreviewOpts delegateOptions
 var delegateRuleOpts delegateOptions
+var delegateRecordOpts delegateOptions
+var delegateRecordInput string
+var delegateRecordModel string
 
 var delegateCmd = &cobra.Command{
 	Use:     "delegate",
@@ -53,7 +58,10 @@ Output review spec for host-agent delegation (no LLM required).`,
   ocr delegate rule internal/agent/agent.go internal/llm/client.go
 
   # Get rules at HEAD for the same range
-  ocr delegate rule --from main internal/agent/agent.go`,
+  ocr delegate rule --from main internal/agent/agent.go
+
+  # Persist the host agent's finished review as a viewable session
+  ocr delegate record --input result.json --from main`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmd.Help()
@@ -86,11 +94,31 @@ var delegateRuleCmd = &cobra.Command{
 	},
 }
 
+var delegateRecordCmd = &cobra.Command{
+	Use:   "record [flags]",
+	Short: "Persist a host-agent review result as an OCR session",
+	Long: "Reads the host agent's final result JSON (--input), re-runs preview to fix the\n" +
+		"selected set, validates coverage, and writes a standard session record viewable\n" +
+		"with 'ocr session' and 'ocr viewer'. No LLM is called.",
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := validateDelegateOptions(&delegateRecordOpts); err != nil {
+			return err
+		}
+		return executeDelegateRecord(delegateRecordOpts, delegateRecordInput, delegateRecordModel)
+	},
+}
+
 func init() {
 	registerDelegateFlags(delegatePreviewCmd, &delegatePreviewOpts)
 	registerDelegateFlags(delegateRuleCmd, &delegateRuleOpts)
+	registerDelegateFlags(delegateRecordCmd, &delegateRecordOpts)
+	delegateRecordCmd.Flags().StringVar(&delegateRecordInput, "input", "", "path to the host agent's result JSON (required)")
+	delegateRecordCmd.Flags().StringVar(&delegateRecordModel, "model", "", "host agent model name recorded for provenance")
+	_ = delegateRecordCmd.MarkFlagRequired("input")
 	delegateCmd.AddCommand(delegatePreviewCmd)
 	delegateCmd.AddCommand(delegateRuleCmd)
+	delegateCmd.AddCommand(delegateRecordCmd)
 }
 
 // delegateContext holds the shared state for delegate sub-commands.
@@ -249,7 +277,80 @@ func executeDelegateRule(opts delegateOptions, paths []string) error {
 	return nil
 }
 
+func executeDelegateRecord(opts delegateOptions, inputPath, hostModel string) error {
+	input, err := delegate.LoadRecordInput(inputPath)
+	if err != nil {
+		return err
+	}
+	dc, err := loadDelegateContext(opts)
+	if err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+	preview, err := dc.preview(ctx)
+	if err != nil {
+		return fmt.Errorf("preview failed: %w", err)
+	}
+	provider := dc.diffProvider()
+	branch, err := dc.cc.GitRunner.Run(ctx, dc.cc.RepoDir, "rev-parse", "--abbrev-ref", "HEAD")
+	if err != nil {
+		branch = ""
+	}
+
+	id, manifest, err := delegate.Record(delegate.RecordArgs{
+		RepoDir:        dc.cc.RepoDir,
+		GitBranch:      strings.TrimSpace(branch),
+		Mode:           dc.reviewMode(),
+		From:           opts.from,
+		To:             opts.to,
+		Commit:         opts.commit,
+		Resolution:     provider.ResolveInput(ctx),
+		RemoteIdentity: provider.RemoteIdentity(ctx),
+		Preview:        preview,
+		Input:          input,
+		Model:          hostModel,
+	})
+	if err != nil {
+		return err
+	}
+
+	if opts.format == "json" {
+		return writeDelegateJSON(delegateRecordJSON{
+			SchemaVersion: delegateSchemaVersion,
+			SessionID:     id,
+			RunManifest:   manifest,
+		})
+	}
+	fmt.Printf("Recorded session %s\n", id)
+	fmt.Printf("  state:    %s\n", manifest.TerminalState)
+	fmt.Printf("  coverage: %d selected = %d completed + %d failed\n",
+		len(manifest.Coverage.Selected), len(manifest.Coverage.Completed), len(manifest.Coverage.Failed))
+	fmt.Printf("  comments: %d\n", len(input.Comments))
+	fmt.Printf("View with 'ocr viewer' or 'ocr session show %s'.\n", id)
+	return nil
+}
+
+// diffProvider builds the provider for the command's mode, mirroring the
+// engine's selection so ResolveInput reports the same comparison endpoints.
+func (dc *delegateContext) diffProvider() *diff.Provider {
+	switch {
+	case dc.opts.commit != "":
+		return diff.NewCommitProvider(dc.cc.RepoDir, dc.opts.commit, dc.cc.GitRunner)
+	case dc.opts.from != "" && dc.opts.to != "":
+		return diff.NewProvider(dc.cc.RepoDir, dc.opts.from, dc.opts.to, dc.cc.GitRunner)
+	default:
+		return diff.NewWorkspaceProvider(dc.cc.RepoDir, dc.cc.GitRunner)
+	}
+}
+
 const delegateSchemaVersion = "1"
+
+type delegateRecordJSON struct {
+	SchemaVersion string               `json:"schema_version"`
+	SessionID     string               `json:"session_id"`
+	RunManifest   *session.RunManifest `json:"run_manifest"`
+}
 
 type delegatePreviewFileJSON struct {
 	Path          string `json:"path"`

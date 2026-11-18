@@ -150,16 +150,55 @@ Classify each finding by severity:
 - **Medium** — performance concerns, error handling gaps. Report with context.
 - **Low** — style nits, minor suggestions. Discard silently unless clearly valuable.
 
+### Step 6: Record the session (optional)
+
+Persist the finished review as a standard OCR session, viewable with
+`ocr session` and `ocr viewer` alongside native runs:
+
+```bash
+ocr delegate record --input <result.json> [--from <ref> [--to <ref>]] [--commit <hash>] [--model <host-model>]
+```
+
+Write the final result to a JSON file outside the repository:
+
+```json
+{
+  "files": [
+    {"path": "internal/app.go", "outcome": "reviewed"},
+    {"path": "large.lock", "outcome": "skipped", "reason": "generated file"}
+  ],
+  "comments": [
+    {"path": "internal/app.go", "content": "missing error handling",
+     "start_line": 12, "end_line": 14, "category": "bug", "severity": "high"}
+  ]
+}
+```
+
+- `files` covers every `reviewable_files` entry from Step 1. `outcome`
+  is `reviewed` or `skipped` (a `reason` is required). Unreported files
+  are recorded as failed and the run ends `partial`.
+- `comments` carry the finding fields from Step 5 and must reference a
+  file reported as `reviewed`.
+- Pass the same range/commit flags as Step 1. OCR re-runs preview to fix
+  the selected set, so in workspace mode record before applying fixes.
+- `--model` records the host agent's model name for provenance.
+
+The command prints the session id; `--format json` returns it together
+with the run manifest. No LLM records are written (OCR did not observe
+the host agent's LLM calls), and `ocr review --resume` refuses delegate
+sessions.
+
 ## Sub-commands reference
 
 | Command | Purpose |
 |---------|---------|
 | `ocr delegate preview` | List reviewable files + mode/ref metadata |
 | `ocr delegate rule <path...>` | Resolve review rules grouped by content |
+| `ocr delegate record --input <file>` | Persist the host agent's result as a viewable session |
 
 ## Shared flags
 
-Both subcommands accept `--from main` as shorthand for `--from main --to HEAD`. Range review compares `merge-base(from, to)..to` and excludes staged, unstaged, and untracked changes; omit range/commit flags for workspace mode. Pass the same range or commit flags to `preview` and `rule` so they use the same target. Range and commit flags are mutually exclusive.
+All subcommands accept `--from main` as shorthand for `--from main --to HEAD`. Range review compares `merge-base(from, to)..to` and excludes staged, unstaged, and untracked changes; omit range/commit flags for workspace mode. Pass the same range or commit flags to `preview`, `rule`, and `record` so they use the same target. Range and commit flags are mutually exclusive. `record` additionally requires `--input <path>` and accepts `--model <name>` (host model provenance) and `--format <text|json>`.
 
 | Flag | Description |
 |------|-------------|

@@ -136,16 +136,47 @@ preview の各 `(path, status)` を `reviewed` または `skipped` として記�
 - **Medium** — パフォーマンスの懸念、エラーハンドリングの欠落。コンテキスト付きで報告。
 - **Low** — スタイルの提案、軽微な改善。明確に価値がない限り静かに破棄。
 
+### ステップ 6：セッションの記録（任意）
+
+完了したレビューを標準の OCR セッションとして永続化し、ネイティブ実行と同様に `ocr session` と `ocr viewer` で閲覧できます：
+
+```bash
+ocr delegate record --input <result.json> [--from <ref> [--to <ref>]] [--commit <hash>] [--model <ホストモデル名>]
+```
+
+最終結果をリポジトリ外の JSON ファイルに書き出します：
+
+```json
+{
+  "files": [
+    {"path": "internal/app.go", "outcome": "reviewed"},
+    {"path": "large.lock", "outcome": "skipped", "reason": "generated file"}
+  ],
+  "comments": [
+    {"path": "internal/app.go", "content": "missing error handling",
+     "start_line": 12, "end_line": 14, "category": "bug", "severity": "high"}
+  ]
+}
+```
+
+- `files` はステップ 1 のすべての `reviewable_files` エントリを網羅します。`outcome` は `reviewed` または `skipped`（`reason` 必須）。未報告のファイルは failed として記録され、実行は `partial` で終了します。
+- `comments` はステップ 5 の指摘フィールドを使い、`reviewed` と報告したファイルを参照する必要があります。
+- ステップ 1 と同じ範囲/コミットフラグを渡してください。OCR は preview を再実行して selected 集合を確定するため、ワークスペースモードでは修正の適用前に記録してください。
+- `--model` はホストエージェントのモデル名を来歴として記録します。
+
+コマンドはセッション id を出力します。`--format json` は run manifest とともに返します。LLM レコードは書き込まれず（OCR はホストエージェントの LLM 呼び出しを観測していない）、`ocr review --resume` はデリゲーションセッションを拒否します。
+
 ## サブコマンドリファレンス
 
 | コマンド | 目的 |
 |----------|------|
 | `ocr delegate preview` | レビュー可能ファイル＋mode/ref メタデータの一覧 |
 | `ocr delegate rule <path...>` | 内容別にグループ化されたレビュールールの解決 |
+| `ocr delegate record --input <file>` | ホストエージェントの結果を閲覧可能なセッションとして永続化 |
 
 ## 共通フラグ
 
-両サブコマンドで `--from main` は `--from main --to HEAD` の省略形です。範囲レビューは `merge-base(from, to)..to` を比較し、ステージ済み・未ステージ・未追跡の変更を含みません。範囲とコミットのフラグを省略するとワークスペースモードになります。同じターゲットを使うため、`preview` と `rule` には同じ範囲またはコミットのフラグを渡してください。範囲とコミットのフラグは併用できません。
+すべてのサブコマンドで `--from main` は `--from main --to HEAD` の省略形です。範囲レビューは `merge-base(from, to)..to` を比較し、ステージ済み・未ステージ・未追跡の変更を含みません。範囲とコミットのフラグを省略するとワークスペースモードになります。同じターゲットを使うため、`preview`・`rule`・`record` には同じ範囲またはコミットのフラグを渡してください。範囲とコミットのフラグは併用できません。`record` にはさらに `--input <path>` が必須で、`--model <name>`（ホストモデルの来歴）と `--format <text|json>` を受け付けます。
 
 | フラグ | 説明 |
 |--------|------|

@@ -139,6 +139,32 @@ Group findings by severity:
 
 Discard likely false positives silently.
 
+### Step 6.5: Record the Session (Optional, Best-Effort)
+
+Persist the finished review as a standard OCR session, viewable with `ocr session` and `ocr viewer`:
+
+1. Write the final result to a JSON file at a unique absolute path outside the repository (create its parent directory). `files` must contain every `reviewable_files` entry from Step 1 exactly once; `comments` are the Step 5 findings and must reference files reported as `reviewed`:
+
+```json
+{
+  "files": [
+    {"path": "<path>", "outcome": "reviewed"},
+    {"path": "<path>", "outcome": "skipped", "reason": "<why>"}
+  ],
+  "comments": [
+    {"path": "<path>", "content": "<issue>", "start_line": 1, "end_line": 2, "category": "bug", "severity": "high"}
+  ]
+}
+```
+
+2. Run with the same range/commit flags as Step 1, **before** applying any Step 7 fixes (OCR re-runs preview to fix the selected set):
+
+```bash
+ocr delegate record --format json --input <result-file> [--from <ref> [--to <ref>]] [--commit <hash>] [--model <your-model-name>]
+```
+
+3. Append the returned `session_id` to the report. Recording never blocks the review: on `unknown command "record"` (older CLI) skip this step and note that no session was recorded; on a validation error fix the JSON per the message and retry once, then skip if it still fails.
+
 ### Step 7: Fix (Optional)
 
 If the user requested "review and fix":
@@ -152,6 +178,7 @@ If the user requested "review and fix":
 |---------|---------|
 | `ocr delegate preview` | Which files to review + mode/ref metadata |
 | `ocr delegate rule <path...>` | Review rules grouped by content |
+| `ocr delegate record --input <file>` | Persist the result as a viewable OCR session |
 
 ## Shared Flags
 

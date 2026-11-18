@@ -146,16 +146,47 @@ preview의 각 `(path, status)`를 `reviewed` 또는 `skipped`로 기록하고, 
 - **Medium** — 성능 문제, 오류 처리 누락. 맥락과 함께 보고합니다.
 - **Low** — 스타일 지적, 사소한 제안. 분명히 가치 있는 경우가 아니면 조용히 버립니다.
 
+### 6단계: 세션 기록(선택) {#step-6-record-the-session-optional}
+
+완료된 리뷰를 표준 OCR 세션으로 영속화하면 네이티브 실행과 마찬가지로 `ocr session`과 `ocr viewer`로 조회할 수 있습니다:
+
+```bash
+ocr delegate record --input <result.json> [--from <ref> [--to <ref>]] [--commit <hash>] [--model <호스트 모델명>]
+```
+
+최종 결과를 저장소 밖의 JSON 파일로 작성합니다:
+
+```json
+{
+  "files": [
+    {"path": "internal/app.go", "outcome": "reviewed"},
+    {"path": "large.lock", "outcome": "skipped", "reason": "generated file"}
+  ],
+  "comments": [
+    {"path": "internal/app.go", "content": "missing error handling",
+     "start_line": 12, "end_line": 14, "category": "bug", "severity": "high"}
+  ]
+}
+```
+
+- `files`는 1단계의 모든 `reviewable_files` 항목을 포함해야 합니다. `outcome`은 `reviewed` 또는 `skipped`(`reason` 필수)입니다. 보고되지 않은 파일은 failed로 기록되며 실행은 `partial`로 종료됩니다.
+- `comments`는 5단계의 지적 필드를 사용하며 `reviewed`로 보고한 파일을 참조해야 합니다.
+- 1단계와 동일한 범위/커밋 플래그를 전달하세요. OCR이 preview를 다시 실행해 selected 집합을 확정하므로, 워크스페이스 모드에서는 수정을 적용하기 전에 기록하세요.
+- `--model`은 호스트 에이전트의 모델명을 이력으로 기록합니다.
+
+명령은 세션 id를 출력하며 `--format json`은 run manifest와 함께 반환합니다. LLM 레코드는 기록되지 않고(OCR은 호스트 에이전트의 LLM 호출을 관측하지 않음), `ocr review --resume`는 델리게이션 세션을 거부합니다.
+
 ## 하위 명령 레퍼런스 {#sub-commands-reference}
 
 | 명령 | 용도 |
 |---------|---------|
 | `ocr delegate preview` | 리뷰 대상 파일과 모드/ref 메타데이터를 나열 |
 | `ocr delegate rule <path...>` | 리뷰 규칙을 내용별로 묶어 해석 |
+| `ocr delegate record --input <file>` | 호스트 에이전트의 결과를 조회 가능한 세션으로 영속화 |
 
 ## 공통 플래그 {#shared-flags}
 
-두 하위 명령에서 `--from main`은 `--from main --to HEAD`의 축약형입니다. 범위 리뷰는 `merge-base(from, to)..to`를 비교하며 스테이징된 변경, 스테이징되지 않은 변경, 추적되지 않는 파일을 포함하지 않습니다. 범위 및 커밋 플래그를 생략하면 워크스페이스 모드를 사용합니다. 같은 대상을 사용하도록 `preview`와 `rule`에 동일한 범위 또는 커밋 플래그를 전달하세요. 범위 플래그와 커밋 플래그는 함께 사용할 수 없습니다.
+모든 하위 명령에서 `--from main`은 `--from main --to HEAD`의 축약형입니다. 범위 리뷰는 `merge-base(from, to)..to`를 비교하며 스테이징된 변경, 스테이징되지 않은 변경, 추적되지 않는 파일을 포함하지 않습니다. 범위 및 커밋 플래그를 생략하면 워크스페이스 모드를 사용합니다. 같은 대상을 사용하도록 `preview`, `rule`, `record`에 동일한 범위 또는 커밋 플래그를 전달하세요. 범위 플래그와 커밋 플래그는 함께 사용할 수 없습니다. `record`에는 추가로 `--input <path>`가 필수이며 `--model <name>`(호스트 모델 이력)과 `--format <text|json>`을 받습니다.
 
 | 플래그 | 설명 |
 |------|-------------|

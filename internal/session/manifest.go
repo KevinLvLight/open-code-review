@@ -24,9 +24,15 @@ import (
 // value; unknown future versions must be ignored rather than misread.
 const ManifestSchemaVersion = "ocr.run-manifest/v1"
 
-// OperationReview is the manifest operation for a diff review run. It is the
-// only operation wired in v1 (scan stays legacy with no manifest).
+// OperationReview is the manifest operation for a diff review run (scan stays
+// legacy with no manifest).
 const OperationReview = "review"
+
+// OperationDelegate is the manifest operation for a host-agent delegation run
+// persisted by `ocr delegate record`. Resume admits only OperationReview, so a
+// delegate session is refused explicitly instead of being silently re-reviewed
+// by the native engine.
+const OperationDelegate = "delegate"
 
 // Input modes describe how the run's input was selected. They are stored in
 // ManifestInput.Mode (mandatory) and decide how the remaining input fields are
@@ -744,6 +750,11 @@ func sanitizeReason(s string) string {
 	}
 	return s
 }
+
+// SanitizeReason exposes the redaction+truncation floor to callers that persist
+// host-supplied reasons outside the manifest (delegate checkpoints), so every
+// persisted copy of a reason passes through the same single floor.
+func SanitizeReason(s string) string { return sanitizeReason(s) }
 
 // MarkCompleted records that the item's subtask completed. Whether it produced
 // comments does not affect completion.

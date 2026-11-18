@@ -136,16 +136,48 @@ Git 以退出码 0 结束后，分块读取并审查整个文件，再删除临�
 - **Medium** — 性能问题、错误处理缺失。附带上下文报告。
 - **Low** — 风格建议、细微改进。静默丢弃，除非确有价值。
 
+### 第 6 步：记录会话（可选）
+
+把完成的审查持久化为标准 OCR 会话，与原生运行一样可用
+`ocr session` 和 `ocr viewer` 查看：
+
+```bash
+ocr delegate record --input <result.json> [--from <ref> [--to <ref>]] [--commit <hash>] [--model <宿主模型名>]
+```
+
+将最终结果写入仓库外的 JSON 文件：
+
+```json
+{
+  "files": [
+    {"path": "internal/app.go", "outcome": "reviewed"},
+    {"path": "large.lock", "outcome": "skipped", "reason": "generated file"}
+  ],
+  "comments": [
+    {"path": "internal/app.go", "content": "missing error handling",
+     "start_line": 12, "end_line": 14, "category": "bug", "severity": "high"}
+  ]
+}
+```
+
+- `files` 覆盖第 1 步的每个 `reviewable_files` 条目。`outcome` 取 `reviewed` 或 `skipped`（必须给 `reason`）。漏报的文件记为 failed，运行终态为 `partial`。
+- `comments` 使用第 5 步的意见字段，且必须引用报告为 `reviewed` 的文件。
+- 传入与第 1 步相同的范围/提交标志。OCR 会重跑 preview 确定 selected 集，因此工作区模式下请先记录再修复。
+- `--model` 记录宿主 agent 的模型名，用于溯源。
+
+命令打印 session id；`--format json` 连同 run manifest 一起返回。不写入任何 LLM 记录（OCR 未观测宿主 agent 的 LLM 调用），且 `ocr review --resume` 会拒绝委托会话。
+
 ## 子命令参考
 
 | 命令 | 用途 |
 |------|------|
 | `ocr delegate preview` | 列出可审查文件 + mode/ref 元数据 |
 | `ocr delegate rule <path...>` | 按内容分组解析审查规则 |
+| `ocr delegate record --input <file>` | 将宿主 agent 的结果持久化为可查看的会话 |
 
 ## 通用标志
 
-两个子命令都支持将 `--from main` 作为 `--from main --to HEAD` 的简写。范围审查比较 `merge-base(from, to)..to`，不包含暂存、未暂存和未跟踪改动；省略范围及提交标志则使用工作区模式。向 `preview` 和 `rule` 传入相同的范围或提交标志，以使用相同目标。范围标志与提交标志互斥。
+所有子命令都支持将 `--from main` 作为 `--from main --to HEAD` 的简写。范围审查比较 `merge-base(from, to)..to`，不包含暂存、未暂存和未跟踪改动；省略范围及提交标志则使用工作区模式。向 `preview`、`rule` 和 `record` 传入相同的范围或提交标志，以使用相同目标。范围标志与提交标志互斥。`record` 另需 `--input <path>`，并接受 `--model <name>`（宿主模型溯源）与 `--format <text|json>`。
 
 | 标志 | 描述 |
 |------|------|
