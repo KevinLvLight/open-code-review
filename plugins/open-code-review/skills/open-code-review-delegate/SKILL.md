@@ -183,7 +183,7 @@ Persist the finished review as a standard OCR session, viewable with `ocr sessio
 
 `existing_code` and `suggestion_code` are optional, but a comment with a fix must carry both: the recorded session then renders an applicable diff in `ocr viewer` and the IDE extensions. Comments without `suggestion_code` show the finding text only.
 
-`usage` is optional and carries your own token counts for the whole review when you can read them from your runtime. OCR did not observe those calls, so it stores them as a separate `delegate_usage` record: `ocr viewer` adds them to the session totals and marks the numbers host-reported.
+`usage` is required: your own token counts for the whole review, read from your runtime (for Claude Code, the session usage or `/cost`). Supply zeros only when the runtime exposes no counts, and say so in the report. OCR did not observe those calls, so it stores them as a separate `delegate_usage` record: `ocr viewer` adds them to the session totals and marks the numbers host-reported. A result without `usage` is rejected.
 
 2. Run with the same mode flags as Step 1 — `--scan` for a whole-repository run, otherwise the same range/commit flags — **before** applying any Step 7 fixes (OCR re-runs preview to fix the selected set):
 

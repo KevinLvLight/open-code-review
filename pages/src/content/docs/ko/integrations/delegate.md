@@ -186,7 +186,7 @@ ocr delegate record --input <result.json> [--scan | --from <ref> [--to <ref>] | 
 - `files`는 1단계의 모든 `reviewable_files` 항목을 포함해야 합니다. `outcome`은 `reviewed` 또는 `skipped`(`reason` 필수)입니다. 보고되지 않은 파일은 failed로 기록되며 실행은 `partial`로 종료됩니다.
 - `comments`는 5단계의 지적 필드를 사용하며 `reviewed`로 보고한 파일을 참조해야 합니다.
 - `existing_code`와 `suggestion_code`는 선택 사항입니다. 수정을 제안하는 코멘트는 둘 다 포함합니다(교체 대상 스니펫과 교체 코드). `ocr viewer`와 IDE 확장은 이를 적용 가능한 diff로 표시합니다. 줄 번호는 `start_line`/`end_line`에서 오며, `existing_code`로 위치를 잡지는 않습니다.
-- `usage`는 선택 사항이며 호스트 에이전트가 이번 리뷰에서 사용한 자체 토큰 수입니다. OCR은 이를 별도 `delegate_usage` 레코드로 저장하고, `ocr viewer`는 합계에 포함해 호스트 보고로 표시합니다.
+- `usage`는 필수입니다. 호스트 에이전트가 이번 리뷰에서 사용한 자체 토큰 수이며, 런타임이 제공하지 못할 때만 0을 씁니다. OCR은 이를 별도 `delegate_usage` 레코드로 저장하고, `ocr viewer`는 합계에 포함해 호스트 보고로 표시합니다. `usage`가 없는 결과는 거부됩니다.
 - 1단계와 동일한 모드 플래그를 전달하세요(전체 저장소는 `--scan`, 그 외에는 동일한 범위/커밋 플래그). OCR이 preview를 다시 실행해 selected 집합을 확정하므로, 워크스페이스 모드에서는 수정을 적용하기 전에 기록하세요.
 - `--model`은 호스트 에이전트의 모델명을 이력으로 기록하며, 호스트 보고 사용량의 라벨로도 씁니다.
 

@@ -31,6 +31,7 @@ func validInput() *RecordInput {
 			Path: "a.go", Content: "nil dereference", StartLine: 3, EndLine: 5,
 			Category: "bug", Severity: "high",
 		}},
+		Usage: &RecordUsage{PromptTokens: 900, CompletionTokens: 120},
 	}
 }
 
@@ -55,7 +56,8 @@ func TestValidateRecordInput(t *testing.T) {
 		}}, "duplicate file entry"},
 		{"bad outcome", preview, &RecordInput{Files: []RecordFile{{Path: "a.go", Outcome: "done"}}}, "invalid outcome"},
 		{"skipped without reason", preview, &RecordInput{Files: []RecordFile{{Path: "a.go", Outcome: OutcomeSkipped}}}, "requires a reason"},
-		{"skipped with reason", preview, &RecordInput{Files: []RecordFile{{Path: "a.go", Outcome: OutcomeSkipped, Reason: "too large"}}}, ""},
+		{"skipped with reason", preview, &RecordInput{Files: []RecordFile{{Path: "a.go", Outcome: OutcomeSkipped, Reason: "too large"}}, Usage: &RecordUsage{PromptTokens: 1}}, ""},
+		{"missing usage", preview, &RecordInput{Files: []RecordFile{{Path: "a.go", Outcome: OutcomeReviewed}}}, "usage is required"},
 		{"comment unknown path", preview, &RecordInput{
 			Files:    []RecordFile{{Path: "a.go", Outcome: OutcomeReviewed}},
 			Comments: []model.LlmComment{{Path: "ghost.go", Content: "x"}},
@@ -270,7 +272,10 @@ func TestRecord_SkippedFile(t *testing.T) {
 	recordTestHome(t)
 	repoDir := t.TempDir()
 	preview := &model.Preview{Entries: []model.PreviewEntry{reviewable("a.go")}}
-	input := &RecordInput{Files: []RecordFile{{Path: "a.go", Outcome: OutcomeSkipped, Reason: "diff too large"}}}
+	input := &RecordInput{
+		Files: []RecordFile{{Path: "a.go", Outcome: OutcomeSkipped, Reason: "diff too large"}},
+		Usage: &RecordUsage{PromptTokens: 1},
+	}
 
 	_, m, err := Record(workspaceArgs(repoDir, preview, input))
 	if err != nil {
@@ -288,10 +293,13 @@ func TestRecord_SkippedReasonRedactedInCheckpoint(t *testing.T) {
 	recordTestHome(t)
 	repoDir := t.TempDir()
 	preview := &model.Preview{Entries: []model.PreviewEntry{reviewable("a.go")}}
-	input := &RecordInput{Files: []RecordFile{{
-		Path: "a.go", Outcome: OutcomeSkipped,
-		Reason: "fetch failed: Bearer sk-secret123 https://user:pass@host/repo",
-	}}}
+	input := &RecordInput{
+		Files: []RecordFile{{
+			Path: "a.go", Outcome: OutcomeSkipped,
+			Reason: "fetch failed: Bearer sk-secret123 https://user:pass@host/repo",
+		}},
+		Usage: &RecordUsage{PromptTokens: 1},
+	}
 
 	id, m, err := Record(workspaceArgs(repoDir, preview, input))
 	if err != nil {
@@ -318,7 +326,7 @@ func TestRecord_DeletedRecreatedPath(t *testing.T) {
 		{Path: "x.go", Status: "DELETED", WillReview: false, ExcludeReason: model.ExcludeDeleted},
 		{Path: "x.go", Status: "ADDED", WillReview: true},
 	}}
-	input := &RecordInput{Files: []RecordFile{{Path: "x.go", Outcome: OutcomeReviewed}}}
+	input := &RecordInput{Files: []RecordFile{{Path: "x.go", Outcome: OutcomeReviewed}}, Usage: &RecordUsage{PromptTokens: 1}}
 
 	_, m, err := Record(workspaceArgs(repoDir, preview, input))
 	if err != nil {
@@ -336,7 +344,7 @@ func TestRecord_EmptyReviewableSet(t *testing.T) {
 	recordTestHome(t)
 	repoDir := t.TempDir()
 	preview := &model.Preview{Entries: []model.PreviewEntry{excluded("b.lock", model.ExcludeDefaultPath)}}
-	input := &RecordInput{Files: []RecordFile{}}
+	input := &RecordInput{Files: []RecordFile{}, Usage: &RecordUsage{PromptTokens: 1}}
 
 	id, m, err := Record(workspaceArgs(repoDir, preview, input))
 	if err != nil {
@@ -504,7 +512,7 @@ func TestRecord_ValidationFailureCreatesNoSession(t *testing.T) {
 	home := recordTestHome(t)
 	repoDir := t.TempDir()
 	preview := &model.Preview{Entries: []model.PreviewEntry{reviewable("a.go")}}
-	input := &RecordInput{Files: []RecordFile{{Path: "ghost.go", Outcome: OutcomeReviewed}}}
+	input := &RecordInput{Files: []RecordFile{{Path: "ghost.go", Outcome: OutcomeReviewed}}, Usage: &RecordUsage{PromptTokens: 1}}
 
 	if _, _, err := Record(workspaceArgs(repoDir, preview, input)); err == nil {
 		t.Fatal("expected validation error")

@@ -61,7 +61,8 @@ func TestExecuteDelegateRecord_Scan(t *testing.T) {
 		t.Fatal(err)
 	}
 	input := writeRecordResult(t, `{"files":[{"path":"app.go","outcome":"reviewed"}],
-		"comments":[{"path":"app.go","content":"missing error handling","start_line":1,"end_line":1,"category":"bug","severity":"low"}]}`)
+		"comments":[{"path":"app.go","content":"missing error handling","start_line":1,"end_line":1,"category":"bug","severity":"low"}],
+		"usage":{"prompt_tokens":1200,"completion_tokens":80}}`)
 
 	out := captureDelegateStdout(t, func() {
 		if err := executeDelegateRecord(delegateOptions{repoDir: dir, scan: true, format: "json"}, input, "scan-model"); err != nil {

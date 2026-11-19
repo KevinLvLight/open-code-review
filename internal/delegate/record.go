@@ -168,6 +168,12 @@ func ValidateRecordInput(preview *model.Preview, input *RecordInput) error {
 			return fmt.Errorf("record validation: comment %d on %q has invalid line range %d..%d", i+1, c.Path, c.StartLine, c.EndLine)
 		}
 	}
+	// Every delegated run reports usage so cost stays comparable across runs.
+	// A host whose runtime exposes no counts supplies zeros and says so in the
+	// report; the field itself is never omitted.
+	if input.Usage == nil {
+		return fmt.Errorf("record validation: usage is required for delegated runs (report the host agent's token counts; use zeros when the runtime exposes none)")
+	}
 	return nil
 }
 

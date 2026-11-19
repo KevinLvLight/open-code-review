@@ -202,10 +202,11 @@ Write the final result to a JSON file outside the repository:
   and `ocr viewer` and the IDE extensions render it as an applicable
   diff. Line numbers come from `start_line` / `end_line`; delegation
   does not anchor comments through `existing_code`.
-- `usage` is optional: the host agent's own token counts for the whole
-  review. OCR stores them as a separate `delegate_usage` record, so
-  `ocr viewer` includes them in the session totals and marks the numbers
-  as host-reported.
+- `usage` is required: the host agent's own token counts for the whole
+  review (zeros only when the runtime exposes none). OCR stores them as a
+  separate `delegate_usage` record, so `ocr viewer` includes them in the
+  session totals and marks the numbers as host-reported. A result without
+  `usage` is rejected.
 - Pass the same mode flags as Step 1 (`--scan` for a whole-repository
   run, otherwise the same range/commit flags). OCR re-runs preview to fix
   the selected set, so in workspace mode record before applying fixes.

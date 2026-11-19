@@ -40,7 +40,8 @@ func TestExecuteDelegateRecord_Workspace(t *testing.T) {
 		t.Fatal(err)
 	}
 	input := writeRecordResult(t, `{"files":[{"path":"app.go","outcome":"reviewed"}],
-		"comments":[{"path":"app.go","content":"missing doc comment","start_line":1,"end_line":1,"category":"documentation","severity":"low"}]}`)
+		"comments":[{"path":"app.go","content":"missing doc comment","start_line":1,"end_line":1,"category":"documentation","severity":"low"}],
+		"usage":{"prompt_tokens":1200,"completion_tokens":80}}`)
 
 	var got delegateRecordJSON
 	out := captureDelegateStdout(t, func() {
@@ -78,7 +79,7 @@ func TestExecuteDelegateRecord_Range(t *testing.T) {
 	dir := initTestGitRepo(t)
 	freshOCRHome(t)
 	gitCommitFile(t, dir, "b.go", "package b\n", "add b")
-	input := writeRecordResult(t, `{"files":[{"path":"b.go","outcome":"reviewed"}]}`)
+	input := writeRecordResult(t, `{"files":[{"path":"b.go","outcome":"reviewed"}],"usage":{"prompt_tokens":1}}`)
 
 	out := captureDelegateStdout(t, func() {
 		if err := executeDelegateRecord(delegateOptions{repoDir: dir, from: "HEAD~1", to: "HEAD", format: "json"}, input, ""); err != nil {
@@ -98,7 +99,7 @@ func TestExecuteDelegateRecord_Commit(t *testing.T) {
 	dir := initTestGitRepo(t)
 	freshOCRHome(t)
 	gitCommitFile(t, dir, "c.go", "package c\n", "add c")
-	input := writeRecordResult(t, `{"files":[{"path":"c.go","outcome":"reviewed"}]}`)
+	input := writeRecordResult(t, `{"files":[{"path":"c.go","outcome":"reviewed"}],"usage":{"prompt_tokens":1}}`)
 
 	out := captureDelegateStdout(t, func() {
 		if err := executeDelegateRecord(delegateOptions{repoDir: dir, commit: "HEAD", format: "json"}, input, ""); err != nil {
@@ -115,7 +116,7 @@ func TestExecuteDelegateRecord_FromOnlyDefaultsToHEAD(t *testing.T) {
 	dir := initTestGitRepo(t)
 	freshOCRHome(t)
 	gitCommitFile(t, dir, "d.go", "package d\n", "add d")
-	input := writeRecordResult(t, `{"files":[{"path":"d.go","outcome":"reviewed"}]}`)
+	input := writeRecordResult(t, `{"files":[{"path":"d.go","outcome":"reviewed"}],"usage":{"prompt_tokens":1}}`)
 
 	opts := delegateOptions{repoDir: dir, from: "HEAD~1", format: "json"}
 	if err := validateDelegateOptions(&opts); err != nil {
@@ -138,7 +139,7 @@ func TestExecuteDelegateRecord_TextOutput(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "app.go"), []byte("package app\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	input := writeRecordResult(t, `{"files":[{"path":"app.go","outcome":"reviewed"}]}`)
+	input := writeRecordResult(t, `{"files":[{"path":"app.go","outcome":"reviewed"}],"usage":{"prompt_tokens":1}}`)
 
 	out := captureDelegateStdout(t, func() {
 		if err := executeDelegateRecord(delegateOptions{repoDir: dir}, input, ""); err != nil {
@@ -156,7 +157,7 @@ func TestExecuteDelegateRecord_SkippedIsPartialOrFailed(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "app.go"), []byte("package app\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	input := writeRecordResult(t, `{"files":[{"path":"app.go","outcome":"skipped","reason":"diff too large"}]}`)
+	input := writeRecordResult(t, `{"files":[{"path":"app.go","outcome":"skipped","reason":"diff too large"}],"usage":{"prompt_tokens":1}}`)
 
 	out := captureDelegateStdout(t, func() {
 		if err := executeDelegateRecord(delegateOptions{repoDir: dir, format: "json"}, input, ""); err != nil {
