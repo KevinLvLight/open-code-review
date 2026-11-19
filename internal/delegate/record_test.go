@@ -413,6 +413,38 @@ func TestRecord_ScanMode(t *testing.T) {
 	}
 }
 
+func TestRecord_CarriesFixSuggestion(t *testing.T) {
+	home := recordTestHome(t)
+	repoDir := t.TempDir()
+	preview := &model.Preview{Entries: []model.PreviewEntry{reviewable("a.go")}}
+	input := validInput()
+	input.Comments[0].ExistingCode = "x := f()"
+	input.Comments[0].SuggestionCode = "x, err := f()\nif err != nil {\n\treturn err\n}"
+
+	if _, _, err := Record(workspaceArgs(repoDir, preview, input)); err != nil {
+		t.Fatalf("Record: %v", err)
+	}
+
+	paths, err := filepath.Glob(filepath.Join(home, ".opencodereview", "sessions", "*", "*.jsonl"))
+	if err != nil || len(paths) == 0 {
+		t.Fatalf("no session file found: %v", err)
+	}
+	data, err := os.ReadFile(paths[0])
+	if err != nil {
+		t.Fatalf("read session: %v", err)
+	}
+	// The persisted comment keeps the host-supplied fix, so the viewer and IDE
+	// extensions can render it without re-deriving anything.
+	for _, want := range []string{
+		`"existing_code":"x := f()"`,
+		`"suggestion_code":"x, err := f()\nif err != nil {\n\treturn err\n}"`,
+	} {
+		if !strings.Contains(string(data), want) {
+			t.Errorf("session log missing %s:\n%s", want, data)
+		}
+	}
+}
+
 func TestRecord_ValidationFailureCreatesNoSession(t *testing.T) {
 	home := recordTestHome(t)
 	repoDir := t.TempDir()

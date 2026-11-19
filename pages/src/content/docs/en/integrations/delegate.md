@@ -183,7 +183,9 @@ Write the final result to a JSON file outside the repository:
   ],
   "comments": [
     {"path": "internal/app.go", "content": "missing error handling",
-     "start_line": 12, "end_line": 14, "category": "bug", "severity": "high"}
+     "existing_code": "f, err := os.Open(path)",
+     "suggestion_code": "f, err := os.Open(path)\nif err != nil {\n    return err\n}",
+     "start_line": 12, "end_line": 12, "category": "bug", "severity": "high"}
   ]
 }
 ```
@@ -193,6 +195,11 @@ Write the final result to a JSON file outside the repository:
   are recorded as failed and the run ends `partial`.
 - `comments` carry the finding fields from Step 5 and must reference a
   file reported as `reviewed`.
+- `existing_code` and `suggestion_code` are optional; a comment that
+  proposes a fix carries both (the replaced snippet and its replacement),
+  and `ocr viewer` and the IDE extensions render it as an applicable
+  diff. Line numbers come from `start_line` / `end_line`; delegation
+  does not anchor comments through `existing_code`.
 - Pass the same mode flags as Step 1 (`--scan` for a whole-repository
   run, otherwise the same range/commit flags). OCR re-runs preview to fix
   the selected set, so in workspace mode record before applying fixes.

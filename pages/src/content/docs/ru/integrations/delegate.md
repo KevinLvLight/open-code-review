@@ -176,13 +176,16 @@ ocr delegate record --input <result.json> [--scan | --from <ref> [--to <ref>] | 
   ],
   "comments": [
     {"path": "internal/app.go", "content": "missing error handling",
-     "start_line": 12, "end_line": 14, "category": "bug", "severity": "high"}
+     "existing_code": "f, err := os.Open(path)",
+     "suggestion_code": "f, err := os.Open(path)\nif err != nil {\n    return err\n}",
+     "start_line": 12, "end_line": 12, "category": "bug", "severity": "high"}
   ]
 }
 ```
 
 - `files` охватывает каждую запись `reviewable_files` из шага 1. `outcome` — `reviewed` или `skipped` (обязателен `reason`). Незаявленные файлы записываются как failed, и запуск завершается в состоянии `partial`.
 - `comments` используют поля замечаний из шага 5 и должны ссылаться на файл, заявленный как `reviewed`.
+- `existing_code` и `suggestion_code` необязательны; комментарий с предложением исправления передаёт оба поля (заменяемый фрагмент и его замену), и `ocr viewer` с расширениями IDE показывают его как применимый diff. Позицию задают `start_line`/`end_line`; `existing_code` не используется для привязки.
 - Передавайте те же флаги режима, что и на шаге 1 (для всего репозитория — `--scan`, иначе те же флаги диапазона/коммита). OCR заново выполняет preview, чтобы зафиксировать набор selected, поэтому в режиме рабочей области записывайте сессию до применения исправлений.
 - `--model` сохраняет имя модели хост-агента для происхождения.
 

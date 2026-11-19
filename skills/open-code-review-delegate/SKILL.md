@@ -131,10 +131,14 @@ Each comment must follow this structure:
 |-------|------|----------|-------------|
 | path | string | yes | Relative file path |
 | content | string | yes | Review comment describing the issue |
+| existing_code | string | no | Snippet the suggestion replaces (before side of the fix) |
+| suggestion_code | string | no | Proposed replacement code (after side of the fix) |
 | start_line | integer | no | Start line in the new file |
 | end_line | integer | no | End line in the new file |
 | category | enum | no | bug, security, performance, maintainability, test, style, documentation, other |
 | severity | enum | no | critical, high, medium, low |
+
+A comment that suggests a fix carries both `existing_code` and `suggestion_code`. Delegation does not anchor comments through `existing_code` — `start_line` and `end_line` position them — but viewers and IDE extensions only render an applicable edit when `suggestion_code` is present.
 
 ### Step 6: Classify and Report
 
@@ -163,10 +167,14 @@ Persist the finished review as a standard OCR session, viewable with `ocr sessio
     {"path": "<path>", "outcome": "skipped", "reason": "<why>"}
   ],
   "comments": [
-    {"path": "<path>", "content": "<issue>", "start_line": 1, "end_line": 2, "category": "bug", "severity": "high"}
+    {"path": "<path>", "content": "<issue>",
+     "existing_code": "<replaced snippet>", "suggestion_code": "<replacement>",
+     "start_line": 1, "end_line": 2, "category": "bug", "severity": "high"}
   ]
 }
 ```
+
+`existing_code` and `suggestion_code` are optional, but a comment with a fix must carry both: the recorded session then renders an applicable diff in `ocr viewer` and the IDE extensions. Comments without `suggestion_code` show the finding text only.
 
 2. Run with the same mode flags as Step 1 — `--scan` for a whole-repository run, otherwise the same range/commit flags — **before** applying any Step 7 fixes (OCR re-runs preview to fix the selected set):
 
@@ -213,6 +221,7 @@ If the user requested "review and fix":
 - **Working directory matters** — `ocr delegate` operates on the Git repo at the current directory. Use `--repo /path` to override.
 - **Untracked files in workspace mode** — `preview` includes untracked files. For these, read the file directly instead of using `git diff`.
 - **Scan mode has no baseline** — every reviewable file is reviewed whole, and `--scan` must be passed to both `preview` and `record` so the recorded selection matches the review.
+- **Fix suggestions are supplied, not derived** — a comment only renders an applicable edit when it carries `suggestion_code` (with `existing_code`); there is no diff for OCR to infer a fix from.
 - **Background context** — pass `--background` to `preview` when you have requirement context; it appears in the output for your reference during review.
 - **Coverage is mandatory** — every `reviewable_files` entry must end as reviewed or explicitly skipped; do not silently omit files.
 

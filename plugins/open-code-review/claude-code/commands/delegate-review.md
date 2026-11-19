@@ -68,6 +68,6 @@ Classify each issue by severity:
 - **Medium**: Reasonable concerns, performance suggestions, or fixes requiring manual work
 - **Low**: Discard silently (likely false positives, nitpicks, or insufficient context)
 
-Before applying fixes, optionally persist the result as a viewable OCR session (best-effort): write the final `files`/`comments` JSON to a unique path outside the repository and run `ocr delegate record --input <file>` with the same mode flags as Step 1 (`--scan` for a whole-repository run, otherwise the same range/commit flags), then mention the returned session id in the report. If the command reports `unknown command "record"` (older CLI) or fails validation twice, skip recording and report normally.
+Before applying fixes, optionally persist the result as a viewable OCR session (best-effort): write the final `files`/`comments` JSON to a unique path outside the repository and run `ocr delegate record --input <file>` with the same mode flags as Step 1 (`--scan` for a whole-repository run, otherwise the same range/commit flags), then mention the returned session id in the report. Put each fix in the comment's `existing_code` (replaced snippet) and `suggestion_code` (replacement) so `ocr viewer` and the IDE extensions can render and apply it; line numbers come from `start_line`/`end_line`. If the command reports `unknown command "record"` (older CLI) or fails validation twice, skip recording and report normally.
 
 Automatically fix High and Medium issues that are safe and well-defined.
