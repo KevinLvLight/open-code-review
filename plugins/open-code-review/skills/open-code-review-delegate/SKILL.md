@@ -57,6 +57,8 @@ This outputs:
 
 Scan mode enumerates the entire working tree with the standard scan selection — `.gitignore`, include/exclude rules, the extension allowlist and secret paths — so no diff baseline is needed. Use it when the repository has no meaningful baseline commit.
 
+If the CLI rejects `--scan` as an unknown flag, do not repeat the call: fall back to workspace mode with the same `--exclude`, `--rule`, and background flags, review the changed files, and state in the report that whole-repository scanning requires a newer OCR build. Do not silently switch to a range or commit review — those cover a different file set.
+
 ### Step 2: Get Rules for Files
 
 ```bash
@@ -230,6 +232,7 @@ If the user requested "review and fix":
 - **Working directory matters** — `ocr delegate` operates on the Git repo at the current directory. Use `--repo /path` to override.
 - **Untracked files in workspace mode** — `preview` includes untracked files. For these, read the file directly instead of using `git diff`.
 - **Scan mode has no baseline** — every reviewable file is reviewed whole, and `--scan` must be passed to both `preview` and `record` so the recorded selection matches the review.
+- **`--scan` needs a recent CLI** — an older build rejects the flag; fall back to workspace mode and say so in the report rather than switching to a range or commit review, which covers a different file set.
 - **Fix suggestions are supplied, not derived** — a comment only renders an applicable edit when it carries `suggestion_code` (with `existing_code`); there is no diff for OCR to infer a fix from.
 - **Background context** — pass `--background` to `preview` when you have requirement context; it appears in the output for your reference during review.
 - **Coverage is mandatory** — every `reviewable_files` entry must end as reviewed or explicitly skipped; do not silently omit files.

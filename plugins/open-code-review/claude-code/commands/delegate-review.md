@@ -15,7 +15,7 @@ ocr delegate preview [user-args]
 - Default (no user arguments): workspace mode (staged + unstaged + untracked).
 - If the user provides `--commit` or `-c`: pass through as-is.
 - If the user provides `--from` and `--to`: pass through as-is.
-- If the user asks to review the whole repository: pass `--scan` (it cannot be combined with `--from`, `--to`, or `--commit`).
+- If the user asks to review the whole repository: pass `--scan` (it cannot be combined with `--from`, `--to`, or `--commit`). If `--scan` is rejected as an unknown flag, fall back to workspace mode and note in the report that whole-repository scanning needs a newer OCR build.
 - (Optional) Provide `--background "context"` or `-b "context"` for business context.
 - If `ocr` is not found, install it: `npm i -g @alibaba-group/open-code-review`.
 
