@@ -166,12 +166,22 @@ func validCategory(c string) bool {
 	return false
 }
 
+// sessionReviewMode maps the manifest input mode to the session-level review
+// mode. Scan keeps the native "full_scan" label so session listings classify a
+// delegate whole-repository run the same way as a native scan.
+func sessionReviewMode(mode string) string {
+	if mode == session.InputModeScan {
+		return session.ReviewModeFullScan
+	}
+	return mode
+}
+
 // RecordArgs carries everything Record needs, already resolved by the caller
 // so the recording path itself runs no git commands and stays testable.
 type RecordArgs struct {
 	RepoDir        string
 	GitBranch      string
-	Mode           string // session.InputModeWorkspace / InputModeRange / InputModeCommit
+	Mode           string // session.InputModeWorkspace / InputModeRange / InputModeCommit / InputModeScan
 	From           string
 	To             string
 	Commit         string
@@ -194,7 +204,7 @@ func Record(args RecordArgs) (string, *session.RunManifest, error) {
 	}
 
 	sh := session.New(args.RepoDir, args.GitBranch, args.Model, session.SessionOptions{
-		ReviewMode: args.Mode,
+		ReviewMode: sessionReviewMode(args.Mode),
 		DiffFrom:   args.From,
 		DiffTo:     args.To,
 		DiffCommit: args.Commit,
@@ -223,6 +233,8 @@ func Record(args RecordArgs) (string, *session.RunManifest, error) {
 		in.RequestedHead = args.To
 	case session.InputModeCommit:
 		in.RequestedHead = args.Commit
+	case session.InputModeScan:
+		// Scan has no diff baseline, so no endpoints are recorded.
 	}
 	// SourceArtifactSHA256 stays empty: it is built from raw diff fingerprints,
 	// which delegate checkpoints deliberately do not carry. Resume refuses

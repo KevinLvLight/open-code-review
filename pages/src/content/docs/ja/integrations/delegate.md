@@ -53,12 +53,12 @@ cp -R /path/to/open-code-review/skills/open-code-review-delegate ~/.claude/skill
 ### ステップ 1：Preview — レビュー対象の決定
 
 ```bash
-ocr delegate preview [--from <ref> [--to <ref>]] [--commit <hash>] [--exclude <patterns>]
+ocr delegate preview [--from <ref> [--to <ref>]] [--commit <hash>] [--scan] [--exclude <patterns>]
 ```
 
 出力内容：
 
-- **mode** — workspace / range / commit
+- **mode** — workspace / range / commit / scan
 - **ref メタデータ** — from、to、commit、merge\_base
 - **レビュー可能ファイルリスト** — パス、ステータス、挿入/削除行数
 - **除外ファイル** — 除外理由付き
@@ -71,6 +71,9 @@ ocr delegate preview [--from <ref> [--to <ref>]] [--commit <hash>] [--exclude <p
 | ブランチ比較 | `ocr delegate preview --from main --to feature` |
 | 現在のブランチを main と比較 | `ocr delegate preview --from main` |
 | 単一コミット | `ocr delegate preview -c abc123` |
+| リポジトリ全体 | `ocr delegate preview --scan` |
+
+Scan モードは標準スキャンの選択ルール（`.gitignore`、include/exclude ルール、拡張子の許可リスト、機密パス）で作業ツリー全体を列挙します。diff の基準は不要です。`--from`・`--to`・`--commit` とは併用できません。
 
 ### ステップ 2：ファイルのルール取得
 
@@ -101,6 +104,13 @@ git --no-pager show --no-ext-diff --no-textconv --no-color <commit> -- "<path>"
 git --no-pager diff --no-ext-diff --no-textconv --no-color HEAD -- "<path>"        # 追跡ファイル
 cat "<path>"                     # 新規未追跡ファイル
 ```
+
+**Scan モード**（diff の基準なし）：
+```bash
+cat "<path>"
+```
+
+各レビュー対象ファイルを直接読み込みます（大きいファイルは分割して読み込む）。必要に応じて以下のコンテキスト取得コマンドを使います。
 
 コンテキストを取得するには：
 
@@ -141,7 +151,7 @@ preview の各 `(path, status)` を `reviewed` または `skipped` として記�
 完了したレビューを標準の OCR セッションとして永続化し、ネイティブ実行と同様に `ocr session` と `ocr viewer` で閲覧できます：
 
 ```bash
-ocr delegate record --input <result.json> [--from <ref> [--to <ref>]] [--commit <hash>] [--model <ホストモデル名>]
+ocr delegate record --input <result.json> [--scan | --from <ref> [--to <ref>] | --commit <hash>] [--model <ホストモデル名>]
 ```
 
 最終結果をリポジトリ外の JSON ファイルに書き出します：
@@ -161,7 +171,7 @@ ocr delegate record --input <result.json> [--from <ref> [--to <ref>]] [--commit 
 
 - `files` はステップ 1 のすべての `reviewable_files` エントリを網羅します。`outcome` は `reviewed` または `skipped`（`reason` 必須）。未報告のファイルは failed として記録され、実行は `partial` で終了します。
 - `comments` はステップ 5 の指摘フィールドを使い、`reviewed` と報告したファイルを参照する必要があります。
-- ステップ 1 と同じ範囲/コミットフラグを渡してください。OCR は preview を再実行して selected 集合を確定するため、ワークスペースモードでは修正の適用前に記録してください。
+- ステップ 1 と同じモードフラグを渡してください（リポジトリ全体なら `--scan`、それ以外は同じ範囲/コミットフラグ）。OCR は preview を再実行して selected 集合を確定するため、ワークスペースモードでは修正の適用前に記録してください。
 - `--model` はホストエージェントのモデル名を来歴として記録します。
 
 コマンドはセッション id を出力します。`--format json` は run manifest とともに返します。LLM レコードは書き込まれず（OCR はホストエージェントの LLM 呼び出しを観測していない）、`ocr review --resume` はデリゲーションセッションを拒否します。
@@ -170,19 +180,20 @@ ocr delegate record --input <result.json> [--from <ref> [--to <ref>]] [--commit 
 
 | コマンド | 目的 |
 |----------|------|
-| `ocr delegate preview` | レビュー可能ファイル＋mode/ref メタデータの一覧 |
+| `ocr delegate preview [--scan]` | レビュー可能ファイル＋mode/ref メタデータの一覧 |
 | `ocr delegate rule <path...>` | 内容別にグループ化されたレビュールールの解決 |
 | `ocr delegate record --input <file>` | ホストエージェントの結果を閲覧可能なセッションとして永続化 |
 
 ## 共通フラグ
 
-すべてのサブコマンドで `--from main` は `--from main --to HEAD` の省略形です。範囲レビューは `merge-base(from, to)..to` を比較し、ステージ済み・未ステージ・未追跡の変更を含みません。範囲とコミットのフラグを省略するとワークスペースモードになります。同じターゲットを使うため、`preview`・`rule`・`record` には同じ範囲またはコミットのフラグを渡してください。範囲とコミットのフラグは併用できません。`record` にはさらに `--input <path>` が必須で、`--model <name>`（ホストモデルの来歴）と `--format <text|json>` を受け付けます。
+すべてのサブコマンドで `--from main` は `--from main --to HEAD` の省略形です。範囲レビューは `merge-base(from, to)..to` を比較し、ステージ済み・未ステージ・未追跡の変更を含みません。範囲とコミットのフラグを省略するとワークスペースモードになります。同じターゲットを使うため、`preview`・`rule`・`record` には同じ範囲またはコミットのフラグを渡してください。範囲とコミットのフラグは併用できません。`--scan` は `preview` と `record` をリポジトリ全体の実行に切り替え、範囲/コミットフラグとは併用できません。`record` にはさらに `--input <path>` が必須で、`--model <name>`（ホストモデルの来歴）と `--format <text|json>` を受け付けます。
 
 | フラグ | 説明 |
 |--------|------|
 | `--from <ref>` | Range モードのソース参照 |
 | `--to <ref>` | Range モードのターゲット参照。`--from` 指定時の既定値は `HEAD` |
 | `-c, --commit <hash>` | 単一コミットモード |
+| `--scan` | diff ではなくリポジトリ全体（preview/record のみ） |
 | `--repo <path>` | リポジトリルート（デフォルト：cwd） |
 | `--rule <path>` | カスタム rule.json パス |
 | `--exclude <patterns>` | カンマ区切りの除外パターン |

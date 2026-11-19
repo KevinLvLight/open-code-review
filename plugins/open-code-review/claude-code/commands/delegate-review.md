@@ -15,6 +15,7 @@ ocr delegate preview [user-args]
 - Default (no user arguments): workspace mode (staged + unstaged + untracked).
 - If the user provides `--commit` or `-c`: pass through as-is.
 - If the user provides `--from` and `--to`: pass through as-is.
+- If the user asks to review the whole repository: pass `--scan` (it cannot be combined with `--from`, `--to`, or `--commit`).
 - (Optional) Provide `--background "context"` or `-b "context"` for business context.
 - If `ocr` is not found, install it: `npm i -g @alibaba-group/open-code-review`.
 
@@ -37,6 +38,7 @@ The diff commands disable external diff programs, text conversion, and color to 
 - Range: `git --no-pager diff --no-ext-diff --no-textconv --no-color <merge_base>..<to> -- "<path>"`
 - Commit: `git --no-pager show --no-ext-diff --no-textconv --no-color <commit> -- "<path>"`
 - Workspace: `git --no-pager diff --no-ext-diff --no-textconv --no-color HEAD -- "<path>"` (or `cat "<path>"` for untracked files)
+- Scan: `cat "<path>"` — read the whole file and review it as new code
 
 To read context:
 
@@ -66,6 +68,6 @@ Classify each issue by severity:
 - **Medium**: Reasonable concerns, performance suggestions, or fixes requiring manual work
 - **Low**: Discard silently (likely false positives, nitpicks, or insufficient context)
 
-Before applying fixes, optionally persist the result as a viewable OCR session (best-effort): write the final `files`/`comments` JSON to a unique path outside the repository and run `ocr delegate record --input <file>` with the same range/commit flags as Step 1, then mention the returned session id in the report. If the command reports `unknown command "record"` (older CLI) or fails validation twice, skip recording and report normally.
+Before applying fixes, optionally persist the result as a viewable OCR session (best-effort): write the final `files`/`comments` JSON to a unique path outside the repository and run `ocr delegate record --input <file>` with the same mode flags as Step 1 (`--scan` for a whole-repository run, otherwise the same range/commit flags), then mention the returned session id in the report. If the command reports `unknown command "record"` (older CLI) or fails validation twice, skip recording and report normally.
 
 Automatically fix High and Medium issues that are safe and well-defined.

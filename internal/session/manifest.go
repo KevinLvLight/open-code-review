@@ -42,12 +42,15 @@ const (
 	InputModeRange     = "range"
 	InputModeCommit    = "commit"
 	InputModeWorkspace = "workspace"
+	// InputModeScan compares no diff: the whole working tree is the input unit.
+	// Delegation uses it for whole-repository runs, which have no baseline commit.
+	InputModeScan = "scan"
 )
 
-// validInputMode reports whether m is one of the three mandatory input modes.
+// validInputMode reports whether m is one of the supported input modes.
 func validInputMode(m string) bool {
 	switch m {
-	case InputModeRange, InputModeCommit, InputModeWorkspace:
+	case InputModeRange, InputModeCommit, InputModeWorkspace, InputModeScan:
 		return true
 	default:
 		return false

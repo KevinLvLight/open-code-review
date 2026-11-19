@@ -29,13 +29,13 @@ metadata:
 Skip OCR provider setup and `ocr llm test`; the host agent's authentication, usage limits, and costs still apply.
 
 ```bash
-ocr delegate preview --format json [--from <ref> [--to <ref>]] [--commit <hash>] [--exclude <patterns>]
+ocr delegate preview --format json [--from <ref> [--to <ref>]] [--commit <hash>] [--scan] [--exclude <patterns>]
 ```
 
-With `--from` and no `--to`, both delegate subcommands default to `HEAD`. Range review compares the merge-base to the target commit and excludes staged, unstaged, and untracked changes. Omit range/commit flags for workspace mode; range and commit flags are mutually exclusive.
+With `--from` and no `--to`, both delegate subcommands default to `HEAD`. Range review compares the merge-base to the target commit and excludes staged, unstaged, and untracked changes. Omit range/commit flags for workspace mode; range and commit flags are mutually exclusive. `--scan` reviews the whole working tree instead of a diff and cannot be combined with `--from`, `--to`, or `--commit`.
 
 This outputs:
-- **mode** (workspace / range / commit)
+- **mode** (workspace / range / commit / scan)
 - **from / to / commit / merge_base** — ref metadata for constructing git commands
 - **Reviewable file list** — paths, status, insertions/deletions
 - **Excluded files** — with exclusion reason
@@ -48,6 +48,9 @@ This outputs:
 | Branch comparison | `ocr delegate preview --from main --to feature` |
 | Current branch against main | `ocr delegate preview --from main` |
 | Single commit | `ocr delegate preview -c abc123` |
+| Whole repository | `ocr delegate preview --scan` |
+
+Scan mode enumerates the entire working tree with the standard scan selection — `.gitignore`, include/exclude rules, the extension allowlist and secret paths — so no diff baseline is needed. Use it when the repository has no meaningful baseline commit.
 
 ### Step 2: Get Rules for Files
 
@@ -82,6 +85,14 @@ git --no-pager diff --no-ext-diff --no-textconv --no-color HEAD -- "<path>"
 # New untracked files — read directly (entire file is new code)
 cat "<path>"
 ```
+
+**Scan mode** (no diff baseline):
+```bash
+# Read the entire file; review it as new code
+cat "<path>"
+```
+
+Read each reviewable file directly, in chunks for large files; use the context commands below as needed.
 
 To read context:
 
@@ -157,10 +168,10 @@ Persist the finished review as a standard OCR session, viewable with `ocr sessio
 }
 ```
 
-2. Run with the same range/commit flags as Step 1, **before** applying any Step 7 fixes (OCR re-runs preview to fix the selected set):
+2. Run with the same mode flags as Step 1 — `--scan` for a whole-repository run, otherwise the same range/commit flags — **before** applying any Step 7 fixes (OCR re-runs preview to fix the selected set):
 
 ```bash
-ocr delegate record --format json --input <result-file> [--from <ref> [--to <ref>]] [--commit <hash>] [--model <your-model-name>]
+ocr delegate record --format json --input <result-file> [--scan | --from <ref> [--to <ref>] | --commit <hash>] [--model <your-model-name>]
 ```
 
 3. Append the returned `session_id` to the report. Recording never blocks the review: on `unknown command "record"` (older CLI) skip this step and note that no session was recorded; on a validation error fix the JSON per the message and retry once, then skip if it still fails.
@@ -176,7 +187,7 @@ If the user requested "review and fix":
 
 | Command | Purpose |
 |---------|---------|
-| `ocr delegate preview` | Which files to review + mode/ref metadata |
+| `ocr delegate preview [--scan]` | Which files to review + mode/ref metadata |
 | `ocr delegate rule <path...>` | Review rules grouped by content |
 | `ocr delegate record --input <file>` | Persist the result as a viewable OCR session |
 
@@ -187,6 +198,7 @@ If the user requested "review and fix":
 | `--from <ref>` | Source ref for range mode |
 | `--to <ref>` | Target ref for range mode; defaults to `HEAD` when `--from` is supplied in either subcommand |
 | `-c, --commit <hash>` | Single commit mode |
+| `--scan` | Whole repository instead of a diff (preview/record only); cannot be combined with range/commit flags |
 | `--repo <path>` | Repository root (default: cwd) |
 | `--rule <path>` | Custom rule.json path |
 | `--exclude <patterns>` | Comma-separated exclude patterns |
@@ -200,6 +212,7 @@ If the user requested "review and fix":
 - **Rules are grouped** — Files sharing the same rule are grouped together in the output. You can pass any number of paths per call; for large changes, fetch rules per-batch as you review.
 - **Working directory matters** — `ocr delegate` operates on the Git repo at the current directory. Use `--repo /path` to override.
 - **Untracked files in workspace mode** — `preview` includes untracked files. For these, read the file directly instead of using `git diff`.
+- **Scan mode has no baseline** — every reviewable file is reviewed whole, and `--scan` must be passed to both `preview` and `record` so the recorded selection matches the review.
 - **Background context** — pass `--background` to `preview` when you have requirement context; it appears in the output for your reference during review.
 - **Coverage is mandatory** — every `reviewable_files` entry must end as reviewed or explicitly skipped; do not silently omit files.
 

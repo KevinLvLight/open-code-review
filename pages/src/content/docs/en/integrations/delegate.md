@@ -65,12 +65,12 @@ cp -R /path/to/open-code-review/skills/open-code-review-delegate ~/.claude/skill
 ### Step 1: Preview — determine what to review
 
 ```bash
-ocr delegate preview [--from <ref> [--to <ref>]] [--commit <hash>] [--exclude <patterns>]
+ocr delegate preview [--from <ref> [--to <ref>]] [--commit <hash>] [--scan] [--exclude <patterns>]
 ```
 
 Outputs:
 
-- **mode** — workspace / range / commit
+- **mode** — workspace / range / commit / scan
 - **ref metadata** — from, to, commit, merge\_base
 - **Reviewable file list** — paths, status, insertions/deletions
 - **Excluded files** — with exclusion reason
@@ -83,6 +83,12 @@ Common invocations:
 | Branch comparison | `ocr delegate preview --from main --to feature` |
 | Current branch against main | `ocr delegate preview --from main` |
 | Single commit | `ocr delegate preview -c abc123` |
+| Whole repository | `ocr delegate preview --scan` |
+
+Scan mode enumerates the entire working tree with the standard scan
+selection — `.gitignore`, include/exclude rules, the extension allowlist
+and secret paths — so no diff baseline is needed. It cannot be combined
+with `--from`, `--to`, or `--commit`.
 
 ### Step 2: Get rules for files
 
@@ -115,6 +121,14 @@ git --no-pager show --no-ext-diff --no-textconv --no-color <commit> -- "<path>"
 git --no-pager diff --no-ext-diff --no-textconv --no-color HEAD -- "<path>"        # tracked files
 cat "<path>"                     # new untracked files
 ```
+
+**Scan mode** (no diff baseline):
+```bash
+cat "<path>"
+```
+
+Read each reviewable file directly, in chunks for large files; use the
+context commands below as needed.
 
 To read context:
 
@@ -156,7 +170,7 @@ Persist the finished review as a standard OCR session, viewable with
 `ocr session` and `ocr viewer` alongside native runs:
 
 ```bash
-ocr delegate record --input <result.json> [--from <ref> [--to <ref>]] [--commit <hash>] [--model <host-model>]
+ocr delegate record --input <result.json> [--scan | --from <ref> [--to <ref>] | --commit <hash>] [--model <host-model>]
 ```
 
 Write the final result to a JSON file outside the repository:
@@ -179,7 +193,8 @@ Write the final result to a JSON file outside the repository:
   are recorded as failed and the run ends `partial`.
 - `comments` carry the finding fields from Step 5 and must reference a
   file reported as `reviewed`.
-- Pass the same range/commit flags as Step 1. OCR re-runs preview to fix
+- Pass the same mode flags as Step 1 (`--scan` for a whole-repository
+  run, otherwise the same range/commit flags). OCR re-runs preview to fix
   the selected set, so in workspace mode record before applying fixes.
 - `--model` records the host agent's model name for provenance.
 
@@ -192,19 +207,20 @@ sessions.
 
 | Command | Purpose |
 |---------|---------|
-| `ocr delegate preview` | List reviewable files + mode/ref metadata |
+| `ocr delegate preview [--scan]` | List reviewable files + mode/ref metadata |
 | `ocr delegate rule <path...>` | Resolve review rules grouped by content |
 | `ocr delegate record --input <file>` | Persist the host agent's result as a viewable session |
 
 ## Shared flags
 
-All subcommands accept `--from main` as shorthand for `--from main --to HEAD`. Range review compares `merge-base(from, to)..to` and excludes staged, unstaged, and untracked changes; omit range/commit flags for workspace mode. Pass the same range or commit flags to `preview`, `rule`, and `record` so they use the same target. Range and commit flags are mutually exclusive. `record` additionally requires `--input <path>` and accepts `--model <name>` (host model provenance) and `--format <text|json>`.
+All subcommands accept `--from main` as shorthand for `--from main --to HEAD`. Range review compares `merge-base(from, to)..to` and excludes staged, unstaged, and untracked changes; omit range/commit flags for workspace mode. Pass the same range or commit flags to `preview`, `rule`, and `record` so they use the same target. Range and commit flags are mutually exclusive. `--scan` switches `preview` and `record` to a whole-repository run and cannot be combined with range/commit flags. `record` additionally requires `--input <path>` and accepts `--model <name>` (host model provenance) and `--format <text|json>`.
 
 | Flag | Description |
 |------|-------------|
 | `--from <ref>` | Source ref for range mode |
 | `--to <ref>` | Target ref for range mode; defaults to `HEAD` when `--from` is supplied |
 | `-c, --commit <hash>` | Single commit mode |
+| `--scan` | Whole repository instead of a diff (preview/record only) |
 | `--repo <path>` | Repository root (default: cwd) |
 | `--rule <path>` | Custom rule.json path |
 | `--exclude <patterns>` | Comma-separated exclude patterns |

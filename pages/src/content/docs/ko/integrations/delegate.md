@@ -62,12 +62,12 @@ cp -R /path/to/open-code-review/skills/open-code-review-delegate ~/.claude/skill
 ### 1단계: 미리 보기 — 리뷰 대상 확인 {#step-1-preview-determine-what-to-review}
 
 ```bash
-ocr delegate preview [--from <ref> [--to <ref>]] [--commit <hash>] [--exclude <patterns>]
+ocr delegate preview [--from <ref> [--to <ref>]] [--commit <hash>] [--scan] [--exclude <patterns>]
 ```
 
 출력 내용:
 
-- **mode** — workspace / range / commit
+- **mode** — workspace / range / commit / scan
 - **ref 메타데이터** — from, to, commit, merge\_base
 - **리뷰 대상 파일 목록** — 경로, 상태, 추가/삭제 라인 수
 - **제외된 파일** — 제외 사유 포함
@@ -80,6 +80,9 @@ ocr delegate preview [--from <ref> [--to <ref>]] [--commit <hash>] [--exclude <p
 | 브랜치 비교 | `ocr delegate preview --from main --to feature` |
 | 현재 브랜치를 main과 비교 | `ocr delegate preview --from main` |
 | 단일 커밋 | `ocr delegate preview -c abc123` |
+| 전체 저장소 | `ocr delegate preview --scan` |
+
+scan 모드는 표준 스캔 선택 규칙(`.gitignore`, include/exclude 규칙, 확장자 허용 목록, 민감 경로)으로 작업 트리 전체를 열거하므로 diff 기준이 필요하지 않습니다. `--from`, `--to`, `--commit`과 함께 사용할 수 없습니다.
 
 ### 2단계: 파일별 규칙 가져오기 {#step-2-get-rules-for-files}
 
@@ -111,6 +114,13 @@ git --no-pager show --no-ext-diff --no-textconv --no-color <commit> -- "<path>"
 git --no-pager diff --no-ext-diff --no-textconv --no-color HEAD -- "<path>"        # 추적 중인 파일
 cat "<path>"                     # 새로 추가된 추적되지 않은 파일
 ```
+
+**scan 모드**(diff 기준 없음):
+```bash
+cat "<path>"
+```
+
+각 리뷰 대상 파일을 직접 읽으세요(큰 파일은 나누어 읽기). 필요하면 아래 컨텍스트 조회 명령을 사용하세요.
 
 컨텍스트를 조회하려면:
 
@@ -151,7 +161,7 @@ preview의 각 `(path, status)`를 `reviewed` 또는 `skipped`로 기록하고, 
 완료된 리뷰를 표준 OCR 세션으로 영속화하면 네이티브 실행과 마찬가지로 `ocr session`과 `ocr viewer`로 조회할 수 있습니다:
 
 ```bash
-ocr delegate record --input <result.json> [--from <ref> [--to <ref>]] [--commit <hash>] [--model <호스트 모델명>]
+ocr delegate record --input <result.json> [--scan | --from <ref> [--to <ref>] | --commit <hash>] [--model <호스트 모델명>]
 ```
 
 최종 결과를 저장소 밖의 JSON 파일로 작성합니다:
@@ -171,7 +181,7 @@ ocr delegate record --input <result.json> [--from <ref> [--to <ref>]] [--commit 
 
 - `files`는 1단계의 모든 `reviewable_files` 항목을 포함해야 합니다. `outcome`은 `reviewed` 또는 `skipped`(`reason` 필수)입니다. 보고되지 않은 파일은 failed로 기록되며 실행은 `partial`로 종료됩니다.
 - `comments`는 5단계의 지적 필드를 사용하며 `reviewed`로 보고한 파일을 참조해야 합니다.
-- 1단계와 동일한 범위/커밋 플래그를 전달하세요. OCR이 preview를 다시 실행해 selected 집합을 확정하므로, 워크스페이스 모드에서는 수정을 적용하기 전에 기록하세요.
+- 1단계와 동일한 모드 플래그를 전달하세요(전체 저장소는 `--scan`, 그 외에는 동일한 범위/커밋 플래그). OCR이 preview를 다시 실행해 selected 집합을 확정하므로, 워크스페이스 모드에서는 수정을 적용하기 전에 기록하세요.
 - `--model`은 호스트 에이전트의 모델명을 이력으로 기록합니다.
 
 명령은 세션 id를 출력하며 `--format json`은 run manifest와 함께 반환합니다. LLM 레코드는 기록되지 않고(OCR은 호스트 에이전트의 LLM 호출을 관측하지 않음), `ocr review --resume`는 델리게이션 세션을 거부합니다.
@@ -180,19 +190,20 @@ ocr delegate record --input <result.json> [--from <ref> [--to <ref>]] [--commit 
 
 | 명령 | 용도 |
 |---------|---------|
-| `ocr delegate preview` | 리뷰 대상 파일과 모드/ref 메타데이터를 나열 |
+| `ocr delegate preview [--scan]` | 리뷰 대상 파일과 모드/ref 메타데이터를 나열 |
 | `ocr delegate rule <path...>` | 리뷰 규칙을 내용별로 묶어 해석 |
 | `ocr delegate record --input <file>` | 호스트 에이전트의 결과를 조회 가능한 세션으로 영속화 |
 
 ## 공통 플래그 {#shared-flags}
 
-모든 하위 명령에서 `--from main`은 `--from main --to HEAD`의 축약형입니다. 범위 리뷰는 `merge-base(from, to)..to`를 비교하며 스테이징된 변경, 스테이징되지 않은 변경, 추적되지 않는 파일을 포함하지 않습니다. 범위 및 커밋 플래그를 생략하면 워크스페이스 모드를 사용합니다. 같은 대상을 사용하도록 `preview`, `rule`, `record`에 동일한 범위 또는 커밋 플래그를 전달하세요. 범위 플래그와 커밋 플래그는 함께 사용할 수 없습니다. `record`에는 추가로 `--input <path>`가 필수이며 `--model <name>`(호스트 모델 이력)과 `--format <text|json>`을 받습니다.
+모든 하위 명령에서 `--from main`은 `--from main --to HEAD`의 축약형입니다. 범위 리뷰는 `merge-base(from, to)..to`를 비교하며 스테이징된 변경, 스테이징되지 않은 변경, 추적되지 않는 파일을 포함하지 않습니다. 범위 및 커밋 플래그를 생략하면 워크스페이스 모드를 사용합니다. 같은 대상을 사용하도록 `preview`, `rule`, `record`에 동일한 범위 또는 커밋 플래그를 전달하세요. 범위 플래그와 커밋 플래그는 함께 사용할 수 없습니다. `--scan`은 `preview`와 `record`를 전체 저장소 실행으로 전환하며 범위/커밋 플래그와 함께 사용할 수 없습니다. `record`에는 추가로 `--input <path>`가 필수이며 `--model <name>`(호스트 모델 이력)과 `--format <text|json>`을 받습니다.
 
 | 플래그 | 설명 |
 |------|-------------|
 | `--from <ref>` | range 모드의 원본 ref |
 | `--to <ref>` | range 모드의 대상 ref. `--from`을 지정하면 기본값은 `HEAD` |
 | `-c, --commit <hash>` | 단일 커밋 모드 |
+| `--scan` | diff 대신 전체 저장소(preview/record 전용) |
 | `--repo <path>` | 저장소 루트(기본값: 현재 디렉터리) |
 | `--rule <path>` | 커스텀 rule.json 경로 |
 | `--exclude <patterns>` | 쉼표로 구분한 제외 패턴 |

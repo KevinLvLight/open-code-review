@@ -14,6 +14,7 @@ import (
 	"github.com/alibaba/open-code-review/internal/config/rules"
 	"github.com/alibaba/open-code-review/internal/delegate"
 	"github.com/alibaba/open-code-review/internal/diff"
+	"github.com/alibaba/open-code-review/internal/scan"
 	"github.com/alibaba/open-code-review/internal/session"
 	"github.com/alibaba/open-code-review/internal/tool"
 	"github.com/spf13/cobra"
@@ -24,6 +25,7 @@ type delegateOptions struct {
 	from           string
 	to             string
 	commit         string
+	scan           bool
 	excludes       string
 	rulePath       string
 	background     string
@@ -54,6 +56,9 @@ Output review spec for host-agent delegation (no LLM required).`,
   # Preview workspace changes
   ocr delegate preview
 
+  # Preview the whole repository (no diff baseline)
+  ocr delegate preview --scan
+
   # Get rules for multiple files (grouped by content)
   ocr delegate rule internal/agent/agent.go internal/llm/client.go
 
@@ -61,7 +66,10 @@ Output review spec for host-agent delegation (no LLM required).`,
   ocr delegate rule --from main internal/agent/agent.go
 
   # Persist the host agent's finished review as a viewable session
-  ocr delegate record --input result.json --from main`,
+  ocr delegate record --input result.json --from main
+
+  # Persist a whole-repository review as a viewable session
+  ocr delegate record --scan --input result.json`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmd.Help()
@@ -113,6 +121,8 @@ func init() {
 	registerDelegateFlags(delegatePreviewCmd, &delegatePreviewOpts)
 	registerDelegateFlags(delegateRuleCmd, &delegateRuleOpts)
 	registerDelegateFlags(delegateRecordCmd, &delegateRecordOpts)
+	delegatePreviewCmd.Flags().BoolVar(&delegatePreviewOpts.scan, "scan", false, "review the whole repository instead of a diff (no --from/--to/--commit)")
+	delegateRecordCmd.Flags().BoolVar(&delegateRecordOpts.scan, "scan", false, "record a whole-repository review (no --from/--to/--commit)")
 	delegateRecordCmd.Flags().StringVar(&delegateRecordInput, "input", "", "path to the host agent's result JSON (required)")
 	delegateRecordCmd.Flags().StringVar(&delegateRecordModel, "model", "", "host agent model name recorded for provenance")
 	_ = delegateRecordCmd.MarkFlagRequired("input")
@@ -156,6 +166,16 @@ func loadDelegateContext(opts delegateOptions) (*delegateContext, error) {
 // the host agent reviews with its own context window, so OCR's max_tokens is
 // not the limit that applies to delegated work.
 func (dc *delegateContext) preview(ctx context.Context) (*agent.DiffPreview, error) {
+	if dc.opts.scan {
+		// Whole-tree enumeration reuses the native scan selection: gitignore,
+		// include/exclude rules, extension allowlist and secret paths all apply.
+		// The template is left zero for the same reason as the diff path above.
+		return scan.Preview(ctx, scan.Args{
+			RepoDir:    dc.cc.RepoDir,
+			FileFilter: dc.cc.FileFilter,
+			GitRunner:  dc.cc.GitRunner,
+		})
+	}
 	return agent.Preview(ctx, agent.Args{
 		RepoDir:    dc.cc.RepoDir,
 		From:       dc.opts.from,
@@ -178,6 +198,8 @@ func (dc *delegateContext) mergeBase(ctx context.Context) string {
 // reviewMode returns the string mode identifier.
 func (dc *delegateContext) reviewMode() string {
 	switch {
+	case dc.opts.scan:
+		return session.InputModeScan
 	case dc.opts.commit != "":
 		return "commit"
 	case dc.opts.from != "" && dc.opts.to != "":
@@ -292,7 +314,17 @@ func executeDelegateRecord(opts delegateOptions, inputPath, hostModel string) er
 	if err != nil {
 		return fmt.Errorf("preview failed: %w", err)
 	}
-	provider := dc.diffProvider()
+	var resolution diff.InputResolution
+	var remoteIdentity string
+	if dc.opts.scan {
+		// Scan has no diff endpoints to resolve; the remote identity is still
+		// recorded for provenance.
+		remoteIdentity = diff.NewWorkspaceProvider(dc.cc.RepoDir, dc.cc.GitRunner).RemoteIdentity(ctx)
+	} else {
+		provider := dc.diffProvider()
+		resolution = provider.ResolveInput(ctx)
+		remoteIdentity = provider.RemoteIdentity(ctx)
+	}
 	branch, err := dc.cc.GitRunner.Run(ctx, dc.cc.RepoDir, "rev-parse", "--abbrev-ref", "HEAD")
 	if err != nil {
 		branch = ""
@@ -305,8 +337,8 @@ func executeDelegateRecord(opts delegateOptions, inputPath, hostModel string) er
 		From:           opts.from,
 		To:             opts.to,
 		Commit:         opts.commit,
-		Resolution:     provider.ResolveInput(ctx),
-		RemoteIdentity: provider.RemoteIdentity(ctx),
+		Resolution:     resolution,
+		RemoteIdentity: remoteIdentity,
 		Preview:        preview,
 		Input:          input,
 		Model:          hostModel,

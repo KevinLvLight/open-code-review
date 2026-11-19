@@ -195,9 +195,15 @@ func validateScanOptions(opts *scanOptions) error {
 }
 
 func validateDelegateOptions(opts *delegateOptions) error {
-	opts.to = normalizeDiffTarget(opts.from, opts.to, opts.commit)
-	if err := validateDiffMode(opts.from, opts.to, opts.commit); err != nil {
-		return err
+	if opts.scan {
+		if opts.from != "" || opts.to != "" || opts.commit != "" {
+			return fmt.Errorf("--scan cannot be combined with --from, --to, or --commit")
+		}
+	} else {
+		opts.to = normalizeDiffTarget(opts.from, opts.to, opts.commit)
+		if err := validateDiffMode(opts.from, opts.to, opts.commit); err != nil {
+			return err
+		}
 	}
 	if opts.format != "text" && opts.format != "json" {
 		return fmt.Errorf("invalid --format value %q: must be 'text' or 'json'", opts.format)

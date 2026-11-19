@@ -380,6 +380,39 @@ func TestRecord_RangeAndCommitIdentity(t *testing.T) {
 	}
 }
 
+func TestRecord_ScanMode(t *testing.T) {
+	recordTestHome(t)
+	repoDir := t.TempDir()
+	preview := &model.Preview{Entries: []model.PreviewEntry{
+		{Path: "a.go", Status: "scan", WillReview: true},
+		{Path: "README.md", Status: "scan", WillReview: false, ExcludeReason: model.ExcludeExtension},
+	}}
+	args := workspaceArgs(repoDir, preview, validInput())
+	args.Mode = session.InputModeScan
+	args.Resolution = diff.InputResolution{}
+
+	id, m, err := Record(args)
+	if err != nil {
+		t.Fatalf("Record: %v", err)
+	}
+	if m.Input.Mode != session.InputModeScan {
+		t.Errorf("input mode = %q, want scan", m.Input.Mode)
+	}
+	if m.Input.RequestedHead != "" || m.Input.RequestedFrom != "" || m.Input.ResolvedBase != "" || m.Input.ExactRange != "" {
+		t.Errorf("scan input must carry no diff endpoints: %+v", m.Input)
+	}
+	if m.TerminalState != session.StateComplete || len(m.Coverage.Selected) != 1 || len(m.Coverage.Excluded) != 1 {
+		t.Errorf("state=%s coverage=%+v", m.TerminalState, m.Coverage)
+	}
+	summary, err := session.LoadSummary(repoDir, id)
+	if err != nil {
+		t.Fatalf("LoadSummary: %v", err)
+	}
+	if summary.ReviewMode != session.ReviewModeFullScan {
+		t.Errorf("session review mode = %q, want full_scan", summary.ReviewMode)
+	}
+}
+
 func TestRecord_ValidationFailureCreatesNoSession(t *testing.T) {
 	home := recordTestHome(t)
 	repoDir := t.TempDir()
