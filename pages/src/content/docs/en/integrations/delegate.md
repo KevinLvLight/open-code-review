@@ -186,7 +186,9 @@ Write the final result to a JSON file outside the repository:
      "existing_code": "f, err := os.Open(path)",
      "suggestion_code": "f, err := os.Open(path)\nif err != nil {\n    return err\n}",
      "start_line": 12, "end_line": 12, "category": "bug", "severity": "high"}
-  ]
+  ],
+  "usage": {"prompt_tokens": 12000, "completion_tokens": 900,
+            "cache_read_tokens": 4000, "cache_write_tokens": 0}
 }
 ```
 
@@ -200,10 +202,14 @@ Write the final result to a JSON file outside the repository:
   and `ocr viewer` and the IDE extensions render it as an applicable
   diff. Line numbers come from `start_line` / `end_line`; delegation
   does not anchor comments through `existing_code`.
+- `usage` is optional: the host agent's own token counts for the whole
+  review. OCR stores them as a separate `delegate_usage` record, so
+  `ocr viewer` includes them in the session totals and marks the numbers
+  as host-reported.
 - Pass the same mode flags as Step 1 (`--scan` for a whole-repository
   run, otherwise the same range/commit flags). OCR re-runs preview to fix
   the selected set, so in workspace mode record before applying fixes.
-- `--model` records the host agent's model name for provenance.
+- `--model` records the host agent's model name for provenance; it also labels host-reported usage.
 
 The command prints the session id; `--format json` returns it together
 with the run manifest. No LLM records are written (OCR did not observe

@@ -273,6 +273,16 @@ func (sh *SessionHistory) RecordReviewItemDone(filePath, oldPath, newPath, finge
 	}
 }
 
+// RecordHostUsage records token usage the host agent reported for a delegated
+// run. It stays a delegate_usage record rather than an llm_response because OCR
+// never saw the calls; readers can still total it with OCR-observed usage.
+func (sh *SessionHistory) RecordHostUsage(model string, usage TokenUsage) {
+	if sh == nil || sh.persist == nil {
+		return
+	}
+	sh.persist.WriteHostUsage(model, usage)
+}
+
 // RecordReviewItemReused records that this run reused a checkpoint from another session.
 func (sh *SessionHistory) RecordReviewItemReused(filePath, oldPath, newPath, fingerprint, sourceSessionID string, comments []model.LlmComment) {
 	if sh == nil {

@@ -530,6 +530,11 @@ h3 {
     margin-bottom: 0.35rem;
     font-weight: 500;
 }
+.token-source {
+    margin: -0.5rem 0 0.75rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
 .token-table {
     width: 100%;
     border-collapse: separate;

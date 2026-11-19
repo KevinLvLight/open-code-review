@@ -445,6 +445,61 @@ func TestRecord_CarriesFixSuggestion(t *testing.T) {
 	}
 }
 
+func TestRecord_CarriesHostUsage(t *testing.T) {
+	home := recordTestHome(t)
+	repoDir := t.TempDir()
+	preview := &model.Preview{Entries: []model.PreviewEntry{reviewable("a.go")}}
+	input := validInput()
+	input.Usage = &RecordUsage{PromptTokens: 1200, CompletionTokens: 300, CacheReadTokens: 800}
+	args := workspaceArgs(repoDir, preview, input)
+	args.Model = "host-model"
+
+	if _, _, err := Record(args); err != nil {
+		t.Fatalf("Record: %v", err)
+	}
+
+	paths, err := filepath.Glob(filepath.Join(home, ".opencodereview", "sessions", "*", "*.jsonl"))
+	if err != nil || len(paths) == 0 {
+		t.Fatalf("no session file found: %v", err)
+	}
+	data, err := os.ReadFile(paths[0])
+	if err != nil {
+		t.Fatalf("read session: %v", err)
+	}
+	// Host usage gets its own record type so readers can tell it apart from
+	// calls OCR made itself.
+	for _, want := range []string{
+		`"type":"delegate_usage"`,
+		`"source":"host"`,
+		`"model":"host-model"`,
+		`"prompt_tokens":1200`,
+		`"completion_tokens":300`,
+		`"cache_read_tokens":800`,
+	} {
+		if !strings.Contains(string(data), want) {
+			t.Errorf("session log missing %s:\n%s", want, data)
+		}
+	}
+}
+
+func TestRecord_RejectsInvalidUsage(t *testing.T) {
+	recordTestHome(t)
+	preview := &model.Preview{Entries: []model.PreviewEntry{reviewable("a.go")}}
+	for name, usage := range map[string]*RecordUsage{
+		"negative": {PromptTokens: -1},
+		"inexact":  {PromptTokens: 1 << 53},
+		"overflow": {CacheWriteTokens: 1<<62 - 1},
+	} {
+		t.Run(name, func(t *testing.T) {
+			input := validInput()
+			input.Usage = usage
+			if _, _, err := Record(workspaceArgs(t.TempDir(), preview, input)); err == nil {
+				t.Fatal("expected validation error for usage counts outside the exact JSON range")
+			}
+		})
+	}
+}
+
 func TestRecord_ValidationFailureCreatesNoSession(t *testing.T) {
 	home := recordTestHome(t)
 	repoDir := t.TempDir()

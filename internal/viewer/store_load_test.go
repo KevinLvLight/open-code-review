@@ -208,6 +208,37 @@ func TestLoadSession_FullParse(t *testing.T) {
 	}
 }
 
+func TestLoadSession_HostReportedUsage(t *testing.T) {
+	root := t.TempDir()
+	repoDir := filepath.Join(root, "repo")
+	if err := os.MkdirAll(repoDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	writeJSONL(t, filepath.Join(repoDir, "sess1.jsonl"),
+		`{"type":"session_start","reviewMode":"full_scan","model":"host-model"}`,
+		`{"type":"review_item_done","filePath":"a.go","comments":[{"path":"a.go","content":"no error handling"}]}`,
+		`{"type":"delegate_usage","model":"host-model","source":"host","usage":{"prompt_tokens":1200,"completion_tokens":300,"cache_read_tokens":800,"cache_write_tokens":0}}`,
+		`{"type":"session_end","duration_seconds":3}`,
+	)
+
+	vs, err := LoadSession(root, "repo", "sess1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !vs.TokenUsage.HostReported || vs.TokenUsage.HostModel != "host-model" {
+		t.Errorf("host usage provenance = %t/%q, want true/host-model", vs.TokenUsage.HostReported, vs.TokenUsage.HostModel)
+	}
+	if vs.TokenUsage.TotalPromptTokens != 1200 || vs.TokenUsage.TotalCompletionTokens != 300 || vs.TokenUsage.TotalCacheReadTokens != 800 {
+		t.Errorf("totals = %+v, want host counts included", vs.TokenUsage)
+	}
+	// OCR observed no LLM calls, so the request counter stays at zero even
+	// though the host reported usage.
+	if vs.TokenUsage.RequestCount != 0 {
+		t.Errorf("RequestCount = %d, want 0", vs.TokenUsage.RequestCount)
+	}
+}
+
 func TestLoadSession_TaskDoneStates(t *testing.T) {
 	root := t.TempDir()
 	repoDir := filepath.Join(root, "repo")

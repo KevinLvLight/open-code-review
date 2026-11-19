@@ -167,15 +167,18 @@ ocr delegate record --input <result.json> [--scan | --from <ref> [--to <ref>] | 
      "existing_code": "f, err := os.Open(path)",
      "suggestion_code": "f, err := os.Open(path)\nif err != nil {\n    return err\n}",
      "start_line": 12, "end_line": 12, "category": "bug", "severity": "high"}
-  ]
+  ],
+  "usage": {"prompt_tokens": 12000, "completion_tokens": 900,
+            "cache_read_tokens": 4000, "cache_write_tokens": 0}
 }
 ```
 
 - `files` はステップ 1 のすべての `reviewable_files` エントリを網羅します。`outcome` は `reviewed` または `skipped`（`reason` 必須）。未報告のファイルは failed として記録され、実行は `partial` で終了します。
 - `comments` はステップ 5 の指摘フィールドを使い、`reviewed` と報告したファイルを参照する必要があります。
 - `existing_code` と `suggestion_code` は任意です。修正を提案するコメントは両方を指定します（置換前のスニペットと置換後のコード）。`ocr viewer` と IDE 拡張は適用可能な diff として表示します。行番号は `start_line`/`end_line` で指定し、`existing_code` によるアンカーは行いません。
+- `usage` は任意で、ホストエージェント自身のレビュー全体のトークン数です。OCR は `delegate_usage` レコードとして保存し、`ocr viewer` は合計に含めてホスト報告として表示します。
 - ステップ 1 と同じモードフラグを渡してください（リポジトリ全体なら `--scan`、それ以外は同じ範囲/コミットフラグ）。OCR は preview を再実行して selected 集合を確定するため、ワークスペースモードでは修正の適用前に記録してください。
-- `--model` はホストエージェントのモデル名を来歴として記録します。
+- `--model` はホストエージェントのモデル名を来歴として記録し、ホスト報告の用量のラベルにも使います。
 
 コマンドはセッション id を出力します。`--format json` は run manifest とともに返します。LLM レコードは書き込まれず（OCR はホストエージェントの LLM 呼び出しを観測していない）、`ocr review --resume` はデリゲーションセッションを拒否します。
 

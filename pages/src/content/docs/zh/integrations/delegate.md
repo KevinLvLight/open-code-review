@@ -168,15 +168,18 @@ ocr delegate record --input <result.json> [--scan | --from <ref> [--to <ref>] | 
      "existing_code": "f, err := os.Open(path)",
      "suggestion_code": "f, err := os.Open(path)\nif err != nil {\n    return err\n}",
      "start_line": 12, "end_line": 12, "category": "bug", "severity": "high"}
-  ]
+  ],
+  "usage": {"prompt_tokens": 12000, "completion_tokens": 900,
+            "cache_read_tokens": 4000, "cache_write_tokens": 0}
 }
 ```
 
 - `files` 覆盖第 1 步的每个 `reviewable_files` 条目。`outcome` 取 `reviewed` 或 `skipped`（必须给 `reason`）。漏报的文件记为 failed，运行终态为 `partial`。
 - `comments` 使用第 5 步的意见字段，且必须引用报告为 `reviewed` 的文件。
 - `existing_code` 与 `suggestion_code` 可选；带修复建议的意见应同时给出二者（被替换片段与替换后的代码），`ocr viewer` 与 IDE 插件会将其渲染为可应用的 diff。行号来自 `start_line`/`end_line`，委托模式不通过 `existing_code` 锚定。
+- `usage` 可选：宿主 agent 本次审查自身的 token 用量。OCR 以独立的 `delegate_usage` 记录保存，`ocr viewer` 会将其计入会话总量并标注为宿主上报。
 - 传入与第 1 步相同的模式标志（整仓运行用 `--scan`，否则沿用相同的范围/提交标志）。OCR 会重跑 preview 确定 selected 集，因此工作区模式下请先记录再修复。
-- `--model` 记录宿主 agent 的模型名，用于溯源。
+- `--model` 记录宿主 agent 的模型名，用于溯源，并用于标注宿主上报的用量。
 
 命令打印 session id；`--format json` 连同 run manifest 一起返回。不写入任何 LLM 记录（OCR 未观测宿主 agent 的 LLM 调用），且 `ocr review --resume` 会拒绝委托会话。
 

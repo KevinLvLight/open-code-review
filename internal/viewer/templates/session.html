@@ -48,6 +48,9 @@
 
 <div class="token-summary">
     <h3>Token Usage</h3>
+    {{if .Session.TokenUsage.HostReported}}
+    <p class="token-source">Totals include usage reported by the host agent{{with .Session.TokenUsage.HostModel}} ({{.}}){{end}}; OCR did not make these calls.</p>
+    {{end}}
     <div class="token-stats">
         <div class="token-item">
             <div class="token-label">Prompt Tokens</div>

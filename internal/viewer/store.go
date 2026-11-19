@@ -271,6 +271,11 @@ type TokenUsageSummary struct {
 	TotalCacheWriteTokens int
 	RequestCount          int
 	FileTokenBreakdown    []FileTokenUsage
+	// HostReported is set when a delegated session carried usage the host
+	// agent reported, and HostModel names that model. The totals then include
+	// counts OCR did not observe: they come from the host's own LLM calls.
+	HostReported bool
+	HostModel    string
 }
 
 // FileTokenUsage tracks token totals for a single file within a session.
@@ -716,6 +721,28 @@ func LoadSession(root, encodedRepo, sessionID string) (*ViewSession, error) {
 					}
 					rc.MarkID = commentMarkID(recUUID, ci, rc, markOccurrences)
 					vs.Comments = append(vs.Comments, rc)
+				}
+			}
+
+		case "delegate_usage":
+			// Host-reported usage from a delegated run. The numbers join the
+			// session totals, but HostReported keeps the provenance visible.
+			if model, ok := rec["model"].(string); ok {
+				vs.TokenUsage.HostModel = model
+			}
+			vs.TokenUsage.HostReported = true
+			if usage, ok := rec["usage"].(map[string]any); ok {
+				if v, ok := usage["prompt_tokens"].(float64); ok {
+					vs.TokenUsage.TotalPromptTokens += int(v)
+				}
+				if v, ok := usage["completion_tokens"].(float64); ok {
+					vs.TokenUsage.TotalCompletionTokens += int(v)
+				}
+				if v, ok := usage["cache_read_tokens"].(float64); ok {
+					vs.TokenUsage.TotalCacheReadTokens += int(v)
+				}
+				if v, ok := usage["cache_write_tokens"].(float64); ok {
+					vs.TokenUsage.TotalCacheWriteTokens += int(v)
 				}
 			}
 

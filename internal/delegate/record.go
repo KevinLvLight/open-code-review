@@ -26,6 +26,17 @@ type RecordInput struct {
 	SchemaVersion string             `json:"schema_version,omitempty"`
 	Files         []RecordFile       `json:"files"`
 	Comments      []model.LlmComment `json:"comments"`
+	Usage         *RecordUsage       `json:"usage,omitempty"`
+}
+
+// RecordUsage is the token usage the host agent reports for its own run. OCR
+// never observes these calls, so the counts are persisted on a record type of
+// their own and the viewer labels them as host-reported.
+type RecordUsage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	CacheReadTokens  int `json:"cache_read_tokens,omitempty"`
+	CacheWriteTokens int `json:"cache_write_tokens,omitempty"`
 }
 
 // RecordFile is the host agent's outcome for one reviewable file.
@@ -86,6 +97,16 @@ func ValidateRecordInput(preview *model.Preview, input *RecordInput) error {
 	}
 	if input.Files == nil {
 		return fmt.Errorf("record validation: files array is required")
+	}
+	if u := input.Usage; u != nil {
+		// The viewer decodes persisted counts as JSON numbers, which are exact
+		// only up to 2^53-1; anything larger would display corrupted totals.
+		const maxExactJSONInt = 1<<53 - 1
+		for _, v := range []int{u.PromptTokens, u.CompletionTokens, u.CacheReadTokens, u.CacheWriteTokens} {
+			if v < 0 || v > maxExactJSONInt {
+				return fmt.Errorf("record validation: usage counts must be between 0 and %d", maxExactJSONInt)
+			}
+		}
 	}
 
 	reviewable := make(map[string]bool)
@@ -310,6 +331,15 @@ func Record(args RecordArgs) (string, *session.RunManifest, error) {
 				return sh.SessionID, nil, fmt.Errorf("mark failed %q: %w", e.Path, err)
 			}
 		}
+	}
+
+	if u := args.Input.Usage; u != nil {
+		sh.RecordHostUsage(args.Model, session.TokenUsage{
+			PromptTokens:     u.PromptTokens,
+			CompletionTokens: u.CompletionTokens,
+			CacheReadTokens:  u.CacheReadTokens,
+			CacheWriteTokens: u.CacheWriteTokens,
+		})
 	}
 
 	m, err := b.Finalize(time.Since(sh.StartTime))

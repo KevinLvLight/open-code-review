@@ -225,6 +225,34 @@ func (jw *jsonlWriter) writeReviewItemRecord(recordType, filePath, oldPath, newP
 	return uuid
 }
 
+// WriteHostUsage records token usage the host agent reported for a delegated
+// run. OCR did not observe these calls, so the record gets its own type instead
+// of an llm_response; the viewer counts it in the totals and marks the source.
+func (jw *jsonlWriter) WriteHostUsage(model string, usage TokenUsage) string {
+	uuid := generateUUID()
+
+	jw.mu.Lock()
+	defer jw.mu.Unlock()
+	rec := map[string]any{
+		"uuid":       uuid,
+		"parentUuid": jw.lastUUID,
+		"type":       "delegate_usage",
+		"sessionId":  jw.sessionID,
+		"timestamp":  time.Now().UTC().Format(time.RFC3339),
+		"model":      model,
+		"source":     "host",
+		"usage": map[string]int{
+			"prompt_tokens":      usage.PromptTokens,
+			"completion_tokens":  usage.CompletionTokens,
+			"cache_read_tokens":  usage.CacheReadTokens,
+			"cache_write_tokens": usage.CacheWriteTokens,
+		},
+	}
+	jw.writeRecordLocked(rec)
+	jw.lastUUID = uuid
+	return uuid
+}
+
 // WriteLLMRequest writes a request entry with the resolved messages.
 func (jw *jsonlWriter) WriteLLMRequest(filePath string, taskType TaskType, requestNo int, messages any) string {
 	uuid := generateUUID()
